@@ -153,7 +153,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,   "/api/pricing/**").hasAnyRole("GESTOR", "ADMIN")
 
                         // ── Equipos ──────────────────────────────────────────────────
-                        // Listado y detalle → público
+                        // Datos completos de gestión → solo gestores y administradores.
+                        .requestMatchers(HttpMethod.GET,    "/api/teams/admin", "/api/teams/admin/**").hasAnyRole("GESTOR", "ADMIN")
+                        // Listado y detalle público → DTO sin datos del responsable.
                         .requestMatchers(HttpMethod.GET,    "/api/teams", "/api/teams/**").permitAll()
                         // Gestión → solo gestores
                         .requestMatchers(HttpMethod.POST,   "/api/teams").hasAnyRole("GESTOR", "ADMIN")

@@ -11,6 +11,7 @@ import es.aelb.backendweb.domain.team.valueobject.TeamId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateTeamRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateTeamRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.TeamResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PublicTeamResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,15 +42,32 @@ public class TeamController {
     }
 
     @GetMapping
-    public ResponseEntity<List<TeamResponse>> findAll() {
-        List<TeamResponse> list = teamRepository.findAll().stream()
-                .map(TeamResponse::from)
+    public ResponseEntity<List<PublicTeamResponse>> findAll() {
+        List<PublicTeamResponse> list = teamRepository.findAll().stream()
+                .map(PublicTeamResponse::from)
                 .toList();
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TeamResponse> findById(@PathVariable String id) {
+    public ResponseEntity<PublicTeamResponse> findById(@PathVariable String id) {
+        return teamRepository.findById(TeamId.of(id))
+                .map(PublicTeamResponse::from)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Datos completos, únicamente para gestores y administradores. */
+    @GetMapping("/admin")
+    public ResponseEntity<List<TeamResponse>> findAllForManagement() {
+        return ResponseEntity.ok(teamRepository.findAll().stream()
+                .map(TeamResponse::from)
+                .toList());
+    }
+
+    /** Detalle completo, únicamente para gestores y administradores. */
+    @GetMapping("/admin/{id}")
+    public ResponseEntity<TeamResponse> findByIdForManagement(@PathVariable String id) {
         return teamRepository.findById(TeamId.of(id))
                 .map(TeamResponse::from)
                 .map(ResponseEntity::ok)
