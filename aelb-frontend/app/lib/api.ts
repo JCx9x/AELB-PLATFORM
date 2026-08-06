@@ -628,13 +628,14 @@ export async function changePassword(
 export interface Team {
   id:                  string
   name:                string
-  responsibleName:     string
-  responsibleLastName: string
-  phone:               string | null
   province:            string
   locality:            string
   hasLogo:             boolean
   logoType:            string | null
+  // Solo presentes en las respuestas de gestión para gestores/administradores.
+  responsibleName?:     string
+  responsibleLastName?: string
+  phone?:               string | null
 }
 
 export interface TeamData {
@@ -654,6 +655,12 @@ export function teamLogoUrl(id: string): string {
 
 export async function getTeams(): Promise<Team[]> {
   const response = await fetch(`${BASE_URL}/api/teams`)
+  if (!response.ok) throw await parseError(response)
+  return response.json()
+}
+
+export async function getManagedTeams(): Promise<Team[]> {
+  const response = await fetchWithAuth('/api/teams/admin')
   if (!response.ok) throw await parseError(response)
   return response.json()
 }

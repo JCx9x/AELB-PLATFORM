@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import Navbar from '../components/Navbar'
-import { getTeams, createTeam, updateTeam, deleteTeam, teamLogoUrl, type Team, type TeamData } from '../lib/api'
+import { getTeams, getManagedTeams, createTeam, updateTeam, deleteTeam, teamLogoUrl, type Team, type TeamData } from '../lib/api'
 import { getSession } from '../lib/auth'
 
 // ── Coordinate system ─────────────────────────────────────────────────────────
@@ -115,8 +115,8 @@ export default function EquiposPage() {
   useEffect(() => { loadTeams() }, [])
 
   function loadTeams() {
-    setLoading(true)
-    getTeams()
+    setLoading(true);
+    (isManager ? getManagedTeams() : getTeams())
       .then(setTeams)
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
@@ -133,8 +133,8 @@ export default function EquiposPage() {
   function openEdit(team: Team) {
     setFormData({
       name:                team.name,
-      responsibleName:     team.responsibleName,
-      responsibleLastName: team.responsibleLastName,
+      responsibleName:     team.responsibleName ?? '',
+      responsibleLastName: team.responsibleLastName ?? '',
       phone:               team.phone ?? '',
       province:            team.province,
       locality:            team.locality,
@@ -470,8 +470,8 @@ export default function EquiposPage() {
                   </div>
 
                   <dl className="space-y-1.5 text-sm">
-                    <TeamDetail label={t('campoResponsable')}  value={`${selected.responsibleName} ${selected.responsibleLastName}`} />
-                    {selected.phone && <TeamDetail label={t('campoTelefono')} value={selected.phone} />}
+                    {isManager && selected.responsibleName && <TeamDetail label={t('campoResponsable')} value={`${selected.responsibleName} ${selected.responsibleLastName ?? ''}`.trim()} />}
+                    {isManager && selected.phone && <TeamDetail label={t('campoTelefono')} value={selected.phone} />}
                     <TeamDetail label={t('campoProvincia')}   value={selected.province} />
                     <TeamDetail label={t('campoLocalidad')}   value={selected.locality} />
                   </dl>
