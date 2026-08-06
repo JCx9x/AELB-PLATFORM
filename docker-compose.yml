@@ -1,0 +1,140 @@
+version: "3.9"
+
+networks:
+  aelb-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  minio-data:
+
+services:
+
+  # -----------------------------------------------------------
+  # MySQL 8
+  # -----------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: aelb-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE}
+      MYSQL_USER:          ${MYSQL_USER}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - aelb-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # -----------------------------------------------------------
+  # MinIO (S3-compatible object storage para desarrollo local)
+  # -----------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: aelb-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Console
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - aelb-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: aelb-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+        mc mb --ignore-existing local/$$STORAGE_BUCKET;
+        exit 0
+      "
+    environment:
+      MINIO_ROOT_USER:  ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      STORAGE_BUCKET:   ${STORAGE_BUCKET:-aelb-images}
+    networks:
+      - aelb-net
+
+  # -----------------------------------------------------------
+  # Backend - Spring Boot
+  # -----------------------------------------------------------
+  backend:
+    build:
+      context: ./backendweb
+      dockerfile: Dockerfile
+    container_name: aelb-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DB_HOST:        mysql
+      DB_PORT:        ${DB_PORT:-3306}
+      DB_NAME:        ${DB_NAME}
+      DB_USER:        ${DB_USER}
+      DB_PASSWORD:    ${DB_PASSWORD}
+      JWT_SECRET:     ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Strict}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      STORAGE_BUCKET:        ${STORAGE_BUCKET:-aelb-images}
+      STORAGE_REGION:        ${STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY:    ${MINIO_ROOT_USER:-minioadmin}
+      STORAGE_SECRET_KEY:    ${MINIO_ROOT_PASSWORD:-minioadmin}
+      STORAGE_ENDPOINT_OVERRIDE: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT:   ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:9000}
+      STRIPE_SECRET_KEY:         ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET:     ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY:           ${STRIPE_CURRENCY:-eur}
+      STRIPE_SUCCESS_URL:        ${STRIPE_SUCCESS_URL:-http://localhost:3000/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}}
+      STRIPE_CANCEL_URL:         ${STRIPE_CANCEL_URL:-http://localhost:3000/perfil?stripe=cancelled}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - aelb-net
+
+  # -----------------------------------------------------------
+  # Frontend - Next.js (rutas dinámicas en ejecución)
+  # -----------------------------------------------------------
+  frontend:
+    build:
+      context: ./aelb-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    container_name: aelb-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - aelb-net

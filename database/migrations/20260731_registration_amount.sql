@@ -1,0 +1,1 @@
+ALTER TABLE registrations ADD COLUMN amount DECIMAL(8,2) NOT NULL DEFAULT 0.00 AFTER category_id;
