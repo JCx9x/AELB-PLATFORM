@@ -13,6 +13,7 @@ import es.aelb.backendweb.application.user.LoginResult;
 import es.aelb.backendweb.application.user.LoginUseCase;
 import es.aelb.backendweb.infrastructure.security.JwtTokenProvider;
 import es.aelb.backendweb.infrastructure.security.AuthCookieProperties;
+import es.aelb.backendweb.infrastructure.security.InMemoryRateLimiter;
 import es.aelb.backendweb.infrastructure.web.dto.request.LoginRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.AuthResponse;
 import jakarta.servlet.http.Cookie;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -51,6 +53,10 @@ public class AuthController {
     private final LogoutUseCase            logoutUseCase;
     private final JwtTokenProvider         jwtTokenProvider;
     private final AuthCookieProperties     authCookieProperties;
+    private final InMemoryRateLimiter      rateLimiter;
+
+    private static final int    LOGIN_ATTEMPTS_PER_ACCOUNT = 5;
+    private static final Duration LOGIN_WINDOW             = Duration.ofMinutes(1);
 
     public AuthController(
             LoginUseCase loginUseCase,
@@ -58,7 +64,8 @@ public class AuthController {
             RefreshSessionUseCase refreshSessionUseCase,
             LogoutUseCase logoutUseCase,
             JwtTokenProvider jwtTokenProvider,
-            AuthCookieProperties authCookieProperties
+            AuthCookieProperties authCookieProperties,
+            InMemoryRateLimiter rateLimiter
     ) {
         this.loginUseCase             = loginUseCase;
         this.issueRefreshTokenUseCase = issueRefreshTokenUseCase;
@@ -66,6 +73,7 @@ public class AuthController {
         this.logoutUseCase            = logoutUseCase;
         this.jwtTokenProvider         = jwtTokenProvider;
         this.authCookieProperties     = authCookieProperties;
+        this.rateLimiter              = rateLimiter;
     }
 
     /** Initializes the double-submit CSRF token before an unsafe browser request. */
@@ -77,7 +85,15 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String normalizedEmail = request.email() == null ? "" : request.email().trim().toLowerCase(Locale.ROOT);
+        String rateLimitKey = "login:" + httpRequest.getRemoteAddr() + ":" + normalizedEmail;
+        if (!rateLimiter.tryConsume(rateLimitKey, LOGIN_ATTEMPTS_PER_ACCOUNT, LOGIN_WINDOW)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .build();
+        }
+
         LoginResult result = loginUseCase.execute(
                 new LoginCommand(request.email(), request.password())
         );
