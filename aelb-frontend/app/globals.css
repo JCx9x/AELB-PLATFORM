@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+:root {
+  --font-lexend: 'Lexend', sans-serif;
+
+  /* AELB 2.0 Design Tokens — Iron Grip Athletics */
+  --color-primary: #af101a;
+  --color-primary-cta: #d32f2f;
+  --color-on-primary: #ffffff;
+  --color-surface: #f9f9f9;
+  --color-surface-card: #ffffff;
+  --color-on-surface: #1a1c1c;
+  --color-on-surface-variant: #5b403d;
+  --color-outline: #8f6f6c;
+  --color-outline-variant: #e4beba;
+  --color-dark: #121212;
+  --color-error: #ba1a1a;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-lexend);
+}
+
+@theme inline {
+  --font-sans: var(--font-lexend);
+}
