@@ -11,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -60,6 +61,15 @@ public class SecurityConfig {
         return http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
+                        // El handler XOR por defecto (protección BREACH) enmascara el token de
+                        // forma distinta en cada acceso a CsrfToken#getToken(); pensado para
+                        // tokens incrustados en HTML renderizado en servidor. Aquí el cliente es
+                        // un SPA que lee la cookie (no HttpOnly a propósito) y la reenvía tal
+                        // cual como cabecera — con el handler XOR ese valor nunca coincide con
+                        // el que se compara en el servidor y el login falla con 403 aunque las
+                        // credenciales sean correctas. Con el handler plano el valor de la
+                        // cookie y el que se debe enviar como cabecera son el mismo.
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         // Stripe authenticates requests with its own signed webhook scheme.
                         .ignoringRequestMatchers("/api/webhooks/stripe"))
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
