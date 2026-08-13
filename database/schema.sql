@@ -189,6 +189,8 @@ CREATE TABLE quotas (
     payment_source ENUM('STRIPE','MANUAL','LEGACY'),
     paid_by_user_id CHAR(36),
     payment_reference VARCHAR(255),
+    stripe_session_id VARCHAR(255) UNIQUE,
+    stripe_session_url VARCHAR(2048),
     created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -244,13 +246,14 @@ CREATE INDEX idx_news_is_published ON news (is_published, published_at);
 
 -- =============================================================
 -- RESULTADOS (PDFs descargables)
--- El PDF se almacena comprimido (GZip) y codificado en base64.
+-- El PDF se almacena en S3; pdf_data se conserva nullable para migrar datos legacy.
 -- =============================================================
 CREATE TABLE results (
     id                CHAR(36)     NOT NULL,
     title             VARCHAR(300) NOT NULL,
     description       TEXT,
-    pdf_data          LONGTEXT     NOT NULL,
+    pdf_data          LONGTEXT,
+    pdf_storage_key   VARCHAR(500),
     pdf_original_size BIGINT       NOT NULL DEFAULT 0,
     pdf_file_name     VARCHAR(255),
     is_published      TINYINT(1)   NOT NULL DEFAULT 0,
@@ -267,13 +270,14 @@ CREATE INDEX idx_results_is_published ON results (is_published, published_at);
 
 -- =============================================================
 -- DOCUMENTACIÓN (PDFs y archivos descargables)
--- El archivo se almacena comprimido (GZip) y codificado en base64.
+-- El archivo se almacena en S3; file_data se conserva nullable para migrar datos legacy.
 -- =============================================================
 CREATE TABLE documents (
     id                 CHAR(36)     NOT NULL,
     title              VARCHAR(300) NOT NULL,
     description        TEXT,
-    file_data          LONGTEXT     NOT NULL,
+    file_data          LONGTEXT,
+    file_storage_key   VARCHAR(500),
     file_original_size BIGINT       NOT NULL DEFAULT 0,
     file_name          VARCHAR(255),
     is_published       TINYINT(1)   NOT NULL DEFAULT 0,

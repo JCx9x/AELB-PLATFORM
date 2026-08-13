@@ -30,6 +30,11 @@ public class JpaChampionshipRepositoryAdapter implements ChampionshipRepository 
     }
 
     @Override
+    public Optional<Championship> findVisibleById(ChampionshipId id) {
+        return jpaRepository.findByIdAndVisibleTrue(id.value()).map(ChampionshipJpaMapper::toDomain);
+    }
+
+    @Override
     public List<Championship> findAll() {
         return jpaRepository.findAll().stream().map(ChampionshipJpaMapper::toDomain).toList();
     }

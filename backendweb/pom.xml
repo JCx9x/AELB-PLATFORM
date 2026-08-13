@@ -85,6 +85,12 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
+		<!-- Métricas (Micrometer) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<!-- AWS SDK v2 (S3 + Presigner) -->
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>

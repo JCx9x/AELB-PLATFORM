@@ -3,29 +3,33 @@ package es.aelb.backendweb.application.result;
 import es.aelb.backendweb.domain.result.Result;
 import es.aelb.backendweb.domain.result.ResultRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
+import es.aelb.backendweb.infrastructure.storage.FileStorage;
+import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
-import java.io.ByteArrayOutputStream;
 import java.util.Base64;
-import java.util.zip.GZIPOutputStream;
 
 public class CreateResultUseCase {
 
     private final ResultRepository resultRepository;
+    private final FileStorage fileStorage;
 
-    public CreateResultUseCase(ResultRepository resultRepository) {
+    public CreateResultUseCase(ResultRepository resultRepository, FileStorage fileStorage) {
         this.resultRepository = resultRepository;
+        this.fileStorage = fileStorage;
     }
 
     public Result execute(CreateResultCommand cmd) {
         byte[] rawBytes       = Base64.getDecoder().decode(cmd.pdfBase64());
         long   originalSize   = rawBytes.length;
-        String compressedB64  = compressAndEncode(rawBytes);
-
         Result result = Result.create(
                 cmd.title(), cmd.description(),
-                compressedB64, originalSize, cmd.pdfFileName(),
+                null, originalSize, cmd.pdfFileName(),
                 UserId.of(cmd.authorUserId())
         );
+
+        String storageKey = StoredFileKeys.result(result.getId().value(), cmd.pdfFileName());
+        fileStorage.put(storageKey, rawBytes, "application/pdf");
+        result.attachPdfStorageKey(storageKey, originalSize, cmd.pdfFileName());
 
         if (cmd.published()) result.publish();
 
@@ -33,14 +37,4 @@ public class CreateResultUseCase {
         return result;
     }
 
-    static String compressAndEncode(byte[] input) {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-             GZIPOutputStream gzip = new GZIPOutputStream(baos)) {
-            gzip.write(input);
-            gzip.finish();
-            return Base64.getEncoder().encodeToString(baos.toByteArray());
-        } catch (Exception e) {
-            throw new IllegalStateException("Error al comprimir el PDF", e);
-        }
-    }
 }

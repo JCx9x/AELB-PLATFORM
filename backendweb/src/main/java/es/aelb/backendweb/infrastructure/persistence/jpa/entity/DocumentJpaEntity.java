@@ -26,8 +26,11 @@ public class DocumentJpaEntity {
     private String description;
 
     @Lob
-    @Column(name = "file_data", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "file_data", columnDefinition = "LONGTEXT")
     private String fileData;
+
+    @Column(name = "file_storage_key", length = 500)
+    private String fileStorageKey;
 
     @Column(name = "file_original_size", nullable = false)
     private long fileOriginalSize;

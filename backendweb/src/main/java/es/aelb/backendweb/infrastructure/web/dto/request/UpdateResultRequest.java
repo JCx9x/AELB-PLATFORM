@@ -12,7 +12,7 @@ public record UpdateResultRequest(
 
         String description,
 
-        String pdfBase64,   // null = keep existing PDF
+        String pdfBase64,   // null = keep existing PDF; el backend lo almacena en S3
         String pdfFileName, // null = keep existing file name
 
         @NotNull

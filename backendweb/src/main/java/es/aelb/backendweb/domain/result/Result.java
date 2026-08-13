@@ -11,7 +11,8 @@ public class Result extends AggregateRoot<ResultId> {
 
     private String        title;
     private String        description;
-    private String        pdfData;         // base64-encoded GZip-compressed PDF
+    private String        pdfData;         // legacy base64 value; null for S3-backed PDFs
+    private String        pdfStorageKey;   // S3 object key for new PDFs
     private long          pdfOriginalSize; // original size in bytes before compression
     private String        pdfFileName;     // original file name
     private boolean       published;
@@ -21,12 +22,13 @@ public class Result extends AggregateRoot<ResultId> {
     private LocalDateTime updatedAt;
 
     private Result(ResultId id, String title, String description,
-                   String pdfData, long pdfOriginalSize, String pdfFileName,
+                   String pdfData, String pdfStorageKey, long pdfOriginalSize, String pdfFileName,
                    UserId authorId, LocalDateTime createdAt) {
         super(id);
         this.title           = title;
         this.description     = description;
         this.pdfData         = pdfData;
+        this.pdfStorageKey   = pdfStorageKey;
         this.pdfOriginalSize = pdfOriginalSize;
         this.pdfFileName     = pdfFileName;
         this.authorId        = authorId;
@@ -40,16 +42,16 @@ public class Result extends AggregateRoot<ResultId> {
                                 UserId authorId) {
         validateTitle(title);
         return new Result(ResultId.generate(), title, description,
-                pdfData, pdfOriginalSize, pdfFileName, authorId, LocalDateTime.now());
+                pdfData, null, pdfOriginalSize, pdfFileName, authorId, LocalDateTime.now());
     }
 
     public static Result reconstitute(
             ResultId id, String title, String description,
-            String pdfData, long pdfOriginalSize, String pdfFileName,
+            String pdfData, String pdfStorageKey, long pdfOriginalSize, String pdfFileName,
             boolean published, LocalDateTime publishedAt,
             UserId authorId, LocalDateTime createdAt, LocalDateTime updatedAt
     ) {
-        Result r = new Result(id, title, description, pdfData, pdfOriginalSize, pdfFileName, authorId, createdAt);
+        Result r = new Result(id, title, description, pdfData, pdfStorageKey, pdfOriginalSize, pdfFileName, authorId, createdAt);
         r.published   = published;
         r.publishedAt = publishedAt;
         r.updatedAt   = updatedAt;
@@ -65,6 +67,15 @@ public class Result extends AggregateRoot<ResultId> {
 
     public void replacePdf(String pdfData, long pdfOriginalSize, String pdfFileName) {
         this.pdfData         = pdfData;
+        this.pdfStorageKey   = null;
+        this.pdfOriginalSize = pdfOriginalSize;
+        this.pdfFileName     = pdfFileName;
+        this.updatedAt       = LocalDateTime.now();
+    }
+
+    public void attachPdfStorageKey(String pdfStorageKey, long pdfOriginalSize, String pdfFileName) {
+        this.pdfData         = null;
+        this.pdfStorageKey   = pdfStorageKey;
         this.pdfOriginalSize = pdfOriginalSize;
         this.pdfFileName     = pdfFileName;
         this.updatedAt       = LocalDateTime.now();
@@ -93,6 +104,7 @@ public class Result extends AggregateRoot<ResultId> {
     public String        getTitle()           { return title; }
     public String        getDescription()     { return description; }
     public String        getPdfData()         { return pdfData; }
+    public String        getPdfStorageKey()   { return pdfStorageKey; }
     public long          getPdfOriginalSize() { return pdfOriginalSize; }
     public String        getPdfFileName()     { return pdfFileName; }
     public boolean       isPublished()        { return published; }

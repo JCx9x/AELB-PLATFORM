@@ -30,6 +30,11 @@ public class JpaResultRepositoryAdapter implements ResultRepository {
     }
 
     @Override
+    public Optional<Result> findPublishedById(ResultId id) {
+        return jpaRepository.findByIdAndPublishedTrue(id.value()).map(ResultJpaMapper::toDomain);
+    }
+
+    @Override
     public List<Result> findAll() {
         return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(ResultJpaMapper::toDomain)

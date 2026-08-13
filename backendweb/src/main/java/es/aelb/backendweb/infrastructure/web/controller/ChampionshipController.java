@@ -60,11 +60,15 @@ public class ChampionshipController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ChampionshipResponse> findById(@PathVariable String id) {
-        return championshipRepository.findById(ChampionshipId.of(id))
-                .map(this::toResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<ChampionshipResponse> findById(@PathVariable String id, Authentication authentication) {
+        ChampionshipId championshipId = ChampionshipId.of(id);
+        Championship championship = (isPrivileged(authentication)
+                ? championshipRepository.findById(championshipId)
+                : championshipRepository.findVisibleById(championshipId)).orElse(null);
+        if (championship == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(toResponse(championship));
     }
 
     @PostMapping
@@ -102,6 +106,12 @@ public class ChampionshipController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         deleteChampionshipUseCase.execute(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR")
+                            || a.getAuthority().equals("ROLE_ADMIN"));
     }
 
     private ChampionshipResponse toResponse(Championship c) {

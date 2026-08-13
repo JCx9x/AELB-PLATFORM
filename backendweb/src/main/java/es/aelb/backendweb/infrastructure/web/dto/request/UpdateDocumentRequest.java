@@ -12,7 +12,7 @@ public record UpdateDocumentRequest(
 
         String description,
 
-        String fileBase64,   // null = keep existing file
+        String fileBase64,   // null = keep existing file; el backend lo almacena en S3
         String fileName,     // null = keep existing file name
 
         @NotNull

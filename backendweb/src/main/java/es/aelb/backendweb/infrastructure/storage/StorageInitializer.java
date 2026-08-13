@@ -3,10 +3,12 @@ package es.aelb.backendweb.infrastructure.storage;
 import es.aelb.backendweb.infrastructure.config.StorageProperties;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Profile;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 @Component
+@Profile("local")
 public class StorageInitializer {
 
     private final S3Client          s3Client;

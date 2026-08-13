@@ -26,8 +26,11 @@ public class ResultJpaEntity {
     private String description;
 
     @Lob
-    @Column(name = "pdf_data", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "pdf_data", columnDefinition = "LONGTEXT")
     private String pdfData;
+
+    @Column(name = "pdf_storage_key", length = 500)
+    private String pdfStorageKey;
 
     @Column(name = "pdf_original_size", nullable = false)
     private long pdfOriginalSize;

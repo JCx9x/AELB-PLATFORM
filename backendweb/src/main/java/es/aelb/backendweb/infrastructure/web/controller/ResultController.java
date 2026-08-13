@@ -11,6 +11,7 @@ import es.aelb.backendweb.domain.result.valueobject.ResultId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateResultRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateResultRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.ResultResponse;
+import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Base64;
 import java.util.List;
@@ -34,17 +36,20 @@ public class ResultController {
     private final UpdateResultUseCase updateResultUseCase;
     private final DeleteResultUseCase deleteResultUseCase;
     private final ResultRepository    resultRepository;
+    private final FileStorage         fileStorage;
 
     public ResultController(
             CreateResultUseCase createResultUseCase,
             UpdateResultUseCase updateResultUseCase,
             DeleteResultUseCase deleteResultUseCase,
-            ResultRepository resultRepository
+            ResultRepository resultRepository,
+            FileStorage fileStorage
     ) {
         this.createResultUseCase = createResultUseCase;
         this.updateResultUseCase = updateResultUseCase;
         this.deleteResultUseCase = deleteResultUseCase;
         this.resultRepository    = resultRepository;
+        this.fileStorage          = fileStorage;
     }
 
     @GetMapping
@@ -60,22 +65,30 @@ public class ResultController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ResultResponse> findById(@PathVariable String id) {
-        return resultRepository.findById(ResultId.of(id))
-                .map(ResultResponse::from)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<ResultResponse> findById(@PathVariable String id, Authentication authentication) {
+        ResultId resultId = ResultId.of(id);
+        Result result = (isPrivileged(authentication)
+                ? resultRepository.findById(resultId)
+                : resultRepository.findPublishedById(resultId)).orElse(null);
+        if (result == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(ResultResponse.from(result));
     }
 
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable String id) {
-        Result result = resultRepository.findById(ResultId.of(id)).orElse(null);
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable String id, Authentication authentication) {
+        ResultId resultId = ResultId.of(id);
+        Result result = (isPrivileged(authentication)
+                ? resultRepository.findById(resultId)
+                : resultRepository.findPublishedById(resultId)).orElse(null);
         if (result == null) {
             return ResponseEntity.notFound().build();
         }
 
-        byte[] compressedBytes = Base64.getDecoder().decode(result.getPdfData());
-        byte[] pdfBytes        = decompress(compressedBytes);
+        byte[] pdfBytes = result.getPdfStorageKey() != null
+                ? readAll(fileStorage.get(result.getPdfStorageKey()))
+                : decompress(Base64.getDecoder().decode(result.getPdfData()));
 
         String fileName = sanitizeFileName(result.getPdfFileName());
 
@@ -121,6 +134,12 @@ public class ResultController {
         return ResponseEntity.noContent().build();
     }
 
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR")
+                            || a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     private static byte[] decompress(byte[] compressed) {
         try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -132,6 +151,15 @@ public class ResultController {
             return baos.toByteArray();
         } catch (Exception e) {
             throw new IllegalStateException("Error al descomprimir el PDF", e);
+        }
+    }
+
+    private static byte[] readAll(InputStream input) {
+        try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            in.transferTo(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new IllegalStateException("Error al descargar el PDF", e);
         }
     }
 

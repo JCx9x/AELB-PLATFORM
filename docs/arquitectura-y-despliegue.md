@@ -23,7 +23,7 @@ Navegador
 | Frontend | Next.js 16, React 19, TypeScript | Interfaz pública, perfil y backoffice. |
 | Backend | Spring Boot 4, Java 21 | API REST, autenticación JWT y reglas de negocio. |
 | Base de datos | MySQL 8.4 | Usuarios, campeonatos, inscripciones, cuotas y contenidos. |
-| Almacenamiento | MinIO en desarrollo / S3 en producción | Imágenes cargadas mediante URLs firmadas. |
+| Almacenamiento | MinIO en desarrollo / S3 en producción | Imágenes, documentos y PDFs en bucket privado; acceso mediante URLs firmadas o API autorizada. |
 
 La orquestación local está en [docker-compose.yml](../docker-compose.yml). Las variables necesarias están en `.env` y no deben incluirse en repositorios públicos.
 
@@ -76,6 +76,33 @@ infrastructure/  JPA, controladores REST, JWT, almacenamiento S3/MinIO
 
 La API utiliza JWT. El frontend lo envía como `Authorization: Bearer ...`. Las rutas públicas incluyen campeonatos visibles, noticias y resultados; las operaciones de gestión requieren los roles `GESTOR` o `ADMIN`.
 
+## Ficheros y almacenamiento de objetos
+
+Las imágenes, documentos y PDFs no deben almacenarse como contenido binario en
+MySQL. El backend recibe actualmente el contenido en Base64 por compatibilidad
+con el frontend, lo decodifica y lo sube al bucket S3/MinIO. En MySQL solo se
+guardan los metadatos y la clave del objeto (`image_key`, `file_storage_key` o
+`pdf_storage_key`).
+
+Los buckets de producción deben ser privados, con cifrado por defecto, bloqueo
+de acceso público y permisos IAM limitados al backend. Las descargas se hacen
+por la API autorizada o mediante URLs presignadas; no se deben guardar URLs
+públicas permanentes en la base de datos.
+
+En desarrollo, MinIO se usa con el flujo equivalente. Los nuevos documentos y
+resultados se almacenan ya fuera de MySQL. Los registros antiguos que todavía
+contienen `file_data` o `pdf_data` se leen como fallback hasta ejecutar la
+migración indicada más abajo.
+
+La conexión del backend a MySQL usa TLS mediante `sslMode`. La aplicación utiliza
+`VERIFY_IDENTITY` por defecto: valida la cadena de confianza del certificado y el
+hostname del servidor. En el Docker Compose local se activa explícitamente el
+perfil `local`, que usa `REQUIRED` porque el certificado generado por el
+contenedor no está instalado en el truststore de la JVM; esto cifra el tráfico,
+pero no sustituye la configuración de producción. En producción no se debe
+activar ese perfil y hay que añadir la CA de MySQL al truststore de la JVM del
+backend. No se usa `allowPublicKeyRetrieval`.
+
 ## Base de datos y migraciones
 
 Hibernate está configurado en modo `validate`: comprueba que la estructura de MySQL coincide con las entidades, pero no crea ni altera tablas automáticamente.
@@ -85,6 +112,20 @@ En una base nueva, MySQL ejecuta [database/schema.sql](../database/schema.sql) a
 ```text
 database/migrations/20260727_annual_quotas.sql
 ```
+
+Para migrar documentos y resultados legacy a S3:
+
+1. Haz un backup de MySQL y verifica que el bucket destino está creado.
+2. Aplica `database/migrations/20260813_files_to_s3.sql`.
+3. Ejecuta temporalmente el backend con `SPRING_PROFILES_ACTIVE=storage-migration`.
+4. Comprueba que cada fila tiene `file_storage_key` o `pdf_storage_key` y que los
+   ficheros se descargan correctamente.
+5. Conserva los campos legacy durante el periodo de verificación. Solo después
+   de validar una copia y una restauración de S3 puedes eliminar `file_data` y
+   `pdf_data` mediante una migración posterior.
+
+El perfil de migración es explícito y repetible: solo procesa filas que todavía
+no tienen clave S3. No debe dejarse activo en el despliegue normal.
 
 No se debe borrar el volumen de MySQL como mecanismo de migración, ya que eliminaría los datos existentes.
 
@@ -117,3 +158,15 @@ o bien el backend:
 docker compose build backend
 docker compose up -d backend
 ```
+
+En producción no se deben usar credenciales estáticas de MinIO ni publicar el
+bucket. La instancia o tarea que ejecuta el backend debe usar un IAM Role con
+acceso únicamente al bucket de ficheros. El contenido de los ficheros viaja
+directamente a S3 desde el backend y las descargas grandes no deben incorporarse
+en respuestas JSON ni persistirse en MySQL.
+
+Para AWS, configura `STORAGE_USE_IAM=true` y deja vacíos `STORAGE_ACCESS_KEY`,
+`STORAGE_SECRET_KEY`, `STORAGE_ENDPOINT_OVERRIDE` y `STORAGE_PUBLIC_ENDPOINT`.
+El SDK utilizará entonces el IAM Role de la instancia. Para MinIO local se
+mantienen `STORAGE_USE_IAM=false` y los endpoints `http://minio:9000` y
+`http://localhost:9000`.

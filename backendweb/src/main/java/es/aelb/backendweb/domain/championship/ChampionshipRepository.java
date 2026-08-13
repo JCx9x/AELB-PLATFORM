@@ -9,6 +9,7 @@ public interface ChampionshipRepository {
 
     void               save(Championship championship);
     Optional<Championship> findById(ChampionshipId id);
+    Optional<Championship> findVisibleById(ChampionshipId id);
     List<Championship> findAll();
     List<Championship> findVisible();
     void               delete(ChampionshipId id);

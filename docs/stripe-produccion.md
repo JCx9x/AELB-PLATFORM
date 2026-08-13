@@ -96,6 +96,14 @@ No añadas ninguna clave secreta como:
 
 Tras actualizar los secretos, despliega o reinicia el contenedor backend para que cargue los nuevos valores.
 
+La misma regla se aplica a documentos y PDFs: no se deben introducir sus
+contenidos en secretos, logs, variables `NEXT_PUBLIC_*` ni imágenes Docker. En
+producción se almacenan en el bucket S3 privado mediante la identidad IAM del
+backend; MySQL conserva únicamente metadatos y claves de objetos. Antes del
+primer despliegue, ejecuta la migración legacy de ficheros documentada en
+`docs/arquitectura-y-despliegue.md` si la base ya contiene documentos o
+resultados.
+
 ## Requisitos de red
 
 1. La URL de webhook debe ser pública y accesible por HTTPS desde Internet.

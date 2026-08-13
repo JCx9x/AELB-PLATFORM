@@ -30,6 +30,8 @@ public class Quota extends AggregateRoot<String> {
     private       PaymentSource      paymentSource;
     private       UserId             paidByUserId;
     private       String             paymentReference;
+    private       String             stripeSessionId;
+    private       String             stripeSessionUrl;
     private final LocalDateTime      createdAt;
     private       LocalDateTime      updatedAt;
 
@@ -59,6 +61,7 @@ public class Quota extends AggregateRoot<String> {
             String id, UserId userId, int year, AgeCategory ageCategory, BigDecimal amount,
             QuotaPaymentStatus status, LocalDate paymentDate, LocalDateTime paidAt,
             PaymentSource paymentSource, UserId paidByUserId, String paymentReference,
+            String stripeSessionId, String stripeSessionUrl,
             LocalDateTime createdAt, LocalDateTime updatedAt
     ) {
         Quota q = new Quota(id, userId, year, ageCategory, amount, createdAt);
@@ -68,6 +71,8 @@ public class Quota extends AggregateRoot<String> {
         q.paymentSource = paymentSource;
         q.paidByUserId = paidByUserId;
         q.paymentReference = paymentReference;
+        q.stripeSessionId = stripeSessionId;
+        q.stripeSessionUrl = stripeSessionUrl;
         q.updatedAt   = updatedAt;
         return q;
     }
@@ -95,6 +100,24 @@ public class Quota extends AggregateRoot<String> {
 
     public boolean isPaid() { return status == QuotaPaymentStatus.PAID; }
 
+    public boolean hasPendingStripeSession() {
+        return status == QuotaPaymentStatus.PENDING
+                && stripeSessionId != null && !stripeSessionId.isBlank()
+                && stripeSessionUrl != null && !stripeSessionUrl.isBlank();
+    }
+
+    public void bindStripeSession(String sessionId, String sessionUrl) {
+        if (status == QuotaPaymentStatus.PAID) {
+            throw new QuotaAlreadyPaidException(userId.value(), year);
+        }
+        if (sessionId == null || sessionId.isBlank() || sessionUrl == null || sessionUrl.isBlank()) {
+            throw new IllegalArgumentException("La sesión de Stripe no es válida");
+        }
+        this.stripeSessionId = sessionId;
+        this.stripeSessionUrl = sessionUrl;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // --- Getters ---
     public UserId             getUserId()     { return userId; }
     public int                getYear()       { return year; }
@@ -106,6 +129,8 @@ public class Quota extends AggregateRoot<String> {
     public PaymentSource      getPaymentSource() { return paymentSource; }
     public UserId             getPaidByUserId() { return paidByUserId; }
     public String             getPaymentReference() { return paymentReference; }
+    public String             getStripeSessionId() { return stripeSessionId; }
+    public String             getStripeSessionUrl() { return stripeSessionUrl; }
     public LocalDateTime      getCreatedAt()  { return createdAt; }
     public LocalDateTime      getUpdatedAt()  { return updatedAt; }
 

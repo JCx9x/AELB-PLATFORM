@@ -9,6 +9,7 @@ public interface NewsRepository {
 
     void               save(News news);
     Optional<News>     findById(NewsId id);
+    Optional<News>     findPublishedById(NewsId id);
     List<News>         findAll();
     List<News>         findPublished();
     void               delete(NewsId id);

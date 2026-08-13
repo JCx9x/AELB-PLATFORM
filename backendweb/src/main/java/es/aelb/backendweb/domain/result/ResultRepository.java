@@ -9,6 +9,7 @@ public interface ResultRepository {
 
     void               save(Result result);
     Optional<Result>   findById(ResultId id);
+    Optional<Result>   findPublishedById(ResultId id);
     List<Result>       findAll();
     List<Result>       findPublished();
     void               delete(ResultId id);

@@ -11,7 +11,8 @@ public class Document extends AggregateRoot<DocumentId> {
 
     private String        title;
     private String        description;
-    private String        fileData;         // base64-encoded GZip-compressed file
+    private String        fileData;         // legacy base64 value; null for S3-backed files
+    private String        fileStorageKey;   // S3 object key for new files
     private long          fileOriginalSize; // original size in bytes before compression
     private String        fileName;         // original file name
     private boolean       published;
@@ -21,12 +22,13 @@ public class Document extends AggregateRoot<DocumentId> {
     private LocalDateTime updatedAt;
 
     private Document(DocumentId id, String title, String description,
-                     String fileData, long fileOriginalSize, String fileName,
+                     String fileData, String fileStorageKey, long fileOriginalSize, String fileName,
                      UserId authorId, LocalDateTime createdAt) {
         super(id);
         this.title            = title;
         this.description      = description;
         this.fileData         = fileData;
+        this.fileStorageKey   = fileStorageKey;
         this.fileOriginalSize = fileOriginalSize;
         this.fileName         = fileName;
         this.authorId         = authorId;
@@ -40,16 +42,16 @@ public class Document extends AggregateRoot<DocumentId> {
                                   UserId authorId) {
         validateTitle(title);
         return new Document(DocumentId.generate(), title, description,
-                fileData, fileOriginalSize, fileName, authorId, LocalDateTime.now());
+                fileData, null, fileOriginalSize, fileName, authorId, LocalDateTime.now());
     }
 
     public static Document reconstitute(
             DocumentId id, String title, String description,
-            String fileData, long fileOriginalSize, String fileName,
+            String fileData, String fileStorageKey, long fileOriginalSize, String fileName,
             boolean published, LocalDateTime publishedAt,
             UserId authorId, LocalDateTime createdAt, LocalDateTime updatedAt
     ) {
-        Document d = new Document(id, title, description, fileData, fileOriginalSize, fileName, authorId, createdAt);
+        Document d = new Document(id, title, description, fileData, fileStorageKey, fileOriginalSize, fileName, authorId, createdAt);
         d.published   = published;
         d.publishedAt = publishedAt;
         d.updatedAt   = updatedAt;
@@ -65,6 +67,15 @@ public class Document extends AggregateRoot<DocumentId> {
 
     public void replaceFile(String fileData, long fileOriginalSize, String fileName) {
         this.fileData         = fileData;
+        this.fileStorageKey   = null;
+        this.fileOriginalSize = fileOriginalSize;
+        this.fileName         = fileName;
+        this.updatedAt        = LocalDateTime.now();
+    }
+
+    public void attachFileStorageKey(String fileStorageKey, long fileOriginalSize, String fileName) {
+        this.fileData         = null;
+        this.fileStorageKey   = fileStorageKey;
         this.fileOriginalSize = fileOriginalSize;
         this.fileName         = fileName;
         this.updatedAt        = LocalDateTime.now();
@@ -93,6 +104,7 @@ public class Document extends AggregateRoot<DocumentId> {
     public String        getTitle()            { return title; }
     public String        getDescription()      { return description; }
     public String        getFileData()         { return fileData; }
+    public String        getFileStorageKey()   { return fileStorageKey; }
     public long          getFileOriginalSize() { return fileOriginalSize; }
     public String        getFileName()         { return fileName; }
     public boolean       isPublished()         { return published; }

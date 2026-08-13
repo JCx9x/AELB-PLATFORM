@@ -60,16 +60,23 @@ public class NewsController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<NewsResponse> findById(@PathVariable String id) {
-        return newsRepository.findById(NewsId.of(id))
-                .map(this::toResponse)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<NewsResponse> findById(@PathVariable String id, Authentication authentication) {
+        NewsId newsId = NewsId.of(id);
+        News news = (isPrivileged(authentication)
+                ? newsRepository.findById(newsId)
+                : newsRepository.findPublishedById(newsId)).orElse(null);
+        if (news == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(toResponse(news));
     }
 
     @GetMapping(value = "/{id}/image")
-    public ResponseEntity<byte[]> getImage(@PathVariable String id) {
-        News news = newsRepository.findById(NewsId.of(id)).orElse(null);
+    public ResponseEntity<byte[]> getImage(@PathVariable String id, Authentication authentication) {
+        NewsId newsId = NewsId.of(id);
+        News news = (isPrivileged(authentication)
+                ? newsRepository.findById(newsId)
+                : newsRepository.findPublishedById(newsId)).orElse(null);
         if (news == null || !news.hasLegacyImage()) {
             return ResponseEntity.notFound().build();
         }
@@ -115,6 +122,12 @@ public class NewsController {
     public ResponseEntity<Void> delete(@PathVariable String id) {
         deleteNewsUseCase.execute(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR")
+                            || a.getAuthority().equals("ROLE_ADMIN"));
     }
 
     private NewsResponse toResponse(News news) {

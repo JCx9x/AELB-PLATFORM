@@ -30,6 +30,11 @@ public class JpaNewsRepositoryAdapter implements NewsRepository {
     }
 
     @Override
+    public Optional<News> findPublishedById(NewsId id) {
+        return jpaRepository.findByIdAndPublishedTrue(id.value()).map(NewsJpaMapper::toDomain);
+    }
+
+    @Override
     public List<News> findAll() {
         return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(NewsJpaMapper::toDomain)

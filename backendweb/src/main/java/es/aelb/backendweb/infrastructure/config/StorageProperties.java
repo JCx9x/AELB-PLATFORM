@@ -9,6 +9,7 @@ public class StorageProperties {
     private String region           = "us-east-1";
     private String accessKey        = "minioadmin";
     private String secretKey        = "minioadmin";
+    private boolean useIamRole      = false;
     private String endpointOverride = "http://localhost:9000";
     private String publicEndpoint   = "http://localhost:9000";
     private int    presignUploadMinutes = 15;
@@ -25,6 +26,9 @@ public class StorageProperties {
 
     public String getSecretKey()            { return secretKey; }
     public void   setSecretKey(String v)    { this.secretKey = v; }
+
+    public boolean isUseIamRole()           { return useIamRole; }
+    public void setUseIamRole(boolean v)    { this.useIamRole = v; }
 
     public String getEndpointOverride()             { return endpointOverride; }
     public void   setEndpointOverride(String v)     { this.endpointOverride = v; }

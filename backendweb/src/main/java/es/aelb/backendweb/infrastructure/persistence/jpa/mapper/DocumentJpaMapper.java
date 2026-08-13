@@ -15,6 +15,7 @@ public class DocumentJpaMapper {
         e.setTitle(document.getTitle());
         e.setDescription(document.getDescription());
         e.setFileData(document.getFileData());
+        e.setFileStorageKey(document.getFileStorageKey());
         e.setFileOriginalSize(document.getFileOriginalSize());
         e.setFileName(document.getFileName());
         e.setPublished(document.isPublished());
@@ -31,6 +32,7 @@ public class DocumentJpaMapper {
                 e.getTitle(),
                 e.getDescription(),
                 e.getFileData(),
+                e.getFileStorageKey(),
                 e.getFileOriginalSize(),
                 e.getFileName(),
                 e.isPublished(),

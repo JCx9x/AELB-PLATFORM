@@ -15,6 +15,7 @@ public class ResultJpaMapper {
         e.setTitle(result.getTitle());
         e.setDescription(result.getDescription());
         e.setPdfData(result.getPdfData());
+        e.setPdfStorageKey(result.getPdfStorageKey());
         e.setPdfOriginalSize(result.getPdfOriginalSize());
         e.setPdfFileName(result.getPdfFileName());
         e.setPublished(result.isPublished());
@@ -31,6 +32,7 @@ public class ResultJpaMapper {
                 e.getTitle(),
                 e.getDescription(),
                 e.getPdfData(),
+                e.getPdfStorageKey(),
                 e.getPdfOriginalSize(),
                 e.getPdfFileName(),
                 e.isPublished(),

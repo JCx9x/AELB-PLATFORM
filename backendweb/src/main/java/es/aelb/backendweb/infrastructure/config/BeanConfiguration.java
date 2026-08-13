@@ -60,8 +60,10 @@ import es.aelb.backendweb.application.quota.ConfirmStripeQuotaPaymentUseCase;
 import es.aelb.backendweb.domain.quota.StripeCheckoutGateway;
 import es.aelb.backendweb.infrastructure.payment.StripeCheckoutGatewayAdapter;
 import es.aelb.backendweb.infrastructure.payment.StripeWebhookVerifier;
+import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import es.aelb.backendweb.infrastructure.config.StripeProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -93,10 +95,10 @@ public class BeanConfiguration {
     public MarkQuotaPaidUseCase markQuotaPaidUseCase(QuotaRepository repository) { return new MarkQuotaPaidUseCase(repository); }
 
     @Bean
-    public StripeCheckoutGateway stripeCheckoutGateway(StripeProperties properties, ObjectMapper objectMapper) { return new StripeCheckoutGatewayAdapter(properties, objectMapper); }
+    public StripeCheckoutGateway stripeCheckoutGateway(StripeProperties properties, ObjectMapper objectMapper, MeterRegistry meterRegistry) { return new StripeCheckoutGatewayAdapter(properties, objectMapper, meterRegistry); }
 
     @Bean
-    public CreateStripeQuotaCheckoutUseCase createStripeQuotaCheckoutUseCase(GetOrCreateUserQuotaUseCase quotas, StripeCheckoutGateway gateway) { return new CreateStripeQuotaCheckoutUseCase(quotas, gateway); }
+    public CreateStripeQuotaCheckoutUseCase createStripeQuotaCheckoutUseCase(GetOrCreateUserQuotaUseCase quotas, QuotaRepository quotaRepository, StripeCheckoutGateway gateway) { return new CreateStripeQuotaCheckoutUseCase(quotas, quotaRepository, gateway); }
 
     @Bean
     public ConfirmStripeQuotaPaymentUseCase confirmStripeQuotaPaymentUseCase(QuotaRepository repository) { return new ConfirmStripeQuotaPaymentUseCase(repository); }
@@ -236,18 +238,18 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public CreateResultUseCase createResultUseCase(ResultRepository resultRepository) {
-        return new CreateResultUseCase(resultRepository);
+    public CreateResultUseCase createResultUseCase(ResultRepository resultRepository, FileStorage fileStorage) {
+        return new CreateResultUseCase(resultRepository, fileStorage);
     }
 
     @Bean
-    public UpdateResultUseCase updateResultUseCase(ResultRepository resultRepository) {
-        return new UpdateResultUseCase(resultRepository);
+    public UpdateResultUseCase updateResultUseCase(ResultRepository resultRepository, FileStorage fileStorage) {
+        return new UpdateResultUseCase(resultRepository, fileStorage);
     }
 
     @Bean
-    public DeleteResultUseCase deleteResultUseCase(ResultRepository resultRepository) {
-        return new DeleteResultUseCase(resultRepository);
+    public DeleteResultUseCase deleteResultUseCase(ResultRepository resultRepository, FileStorage fileStorage) {
+        return new DeleteResultUseCase(resultRepository, fileStorage);
     }
 
     @Bean
@@ -315,18 +317,18 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public CreateDocumentUseCase createDocumentUseCase(DocumentRepository documentRepository) {
-        return new CreateDocumentUseCase(documentRepository);
+    public CreateDocumentUseCase createDocumentUseCase(DocumentRepository documentRepository, FileStorage fileStorage) {
+        return new CreateDocumentUseCase(documentRepository, fileStorage);
     }
 
     @Bean
-    public UpdateDocumentUseCase updateDocumentUseCase(DocumentRepository documentRepository) {
-        return new UpdateDocumentUseCase(documentRepository);
+    public UpdateDocumentUseCase updateDocumentUseCase(DocumentRepository documentRepository, FileStorage fileStorage) {
+        return new UpdateDocumentUseCase(documentRepository, fileStorage);
     }
 
     @Bean
-    public DeleteDocumentUseCase deleteDocumentUseCase(DocumentRepository documentRepository) {
-        return new DeleteDocumentUseCase(documentRepository);
+    public DeleteDocumentUseCase deleteDocumentUseCase(DocumentRepository documentRepository, FileStorage fileStorage) {
+        return new DeleteDocumentUseCase(documentRepository, fileStorage);
     }
 
     @Bean

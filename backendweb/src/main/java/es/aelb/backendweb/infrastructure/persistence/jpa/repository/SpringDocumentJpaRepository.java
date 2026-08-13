@@ -4,9 +4,11 @@ import es.aelb.backendweb.infrastructure.persistence.jpa.entity.DocumentJpaEntit
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SpringDocumentJpaRepository extends JpaRepository<DocumentJpaEntity, String> {
 
     List<DocumentJpaEntity> findByPublishedTrueOrderByPublishedAtDesc();
+    Optional<DocumentJpaEntity> findByIdAndPublishedTrue(String id);
     List<DocumentJpaEntity> findAllByOrderByCreatedAtDesc();
 }

@@ -30,6 +30,11 @@ public class JpaDocumentRepositoryAdapter implements DocumentRepository {
     }
 
     @Override
+    public Optional<Document> findPublishedById(DocumentId id) {
+        return jpaRepository.findByIdAndPublishedTrue(id.value()).map(DocumentJpaMapper::toDomain);
+    }
+
+    @Override
     public List<Document> findAll() {
         return jpaRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(DocumentJpaMapper::toDomain)

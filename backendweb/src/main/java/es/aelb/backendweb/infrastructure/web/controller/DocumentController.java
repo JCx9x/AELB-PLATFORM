@@ -11,6 +11,7 @@ import es.aelb.backendweb.domain.document.valueobject.DocumentId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateDocumentRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateDocumentRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.DocumentResponse;
+import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.Base64;
 import java.util.List;
@@ -34,17 +36,20 @@ public class DocumentController {
     private final UpdateDocumentUseCase updateDocumentUseCase;
     private final DeleteDocumentUseCase deleteDocumentUseCase;
     private final DocumentRepository    documentRepository;
+    private final FileStorage           fileStorage;
 
     public DocumentController(
             CreateDocumentUseCase createDocumentUseCase,
             UpdateDocumentUseCase updateDocumentUseCase,
             DeleteDocumentUseCase deleteDocumentUseCase,
-            DocumentRepository documentRepository
+            DocumentRepository documentRepository,
+            FileStorage fileStorage
     ) {
         this.createDocumentUseCase = createDocumentUseCase;
         this.updateDocumentUseCase = updateDocumentUseCase;
         this.deleteDocumentUseCase = deleteDocumentUseCase;
         this.documentRepository    = documentRepository;
+        this.fileStorage           = fileStorage;
     }
 
     @GetMapping
@@ -60,22 +65,30 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<DocumentResponse> findById(@PathVariable String id) {
-        return documentRepository.findById(DocumentId.of(id))
-                .map(DocumentResponse::from)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<DocumentResponse> findById(@PathVariable String id, Authentication authentication) {
+        DocumentId documentId = DocumentId.of(id);
+        Document document = (isPrivileged(authentication)
+                ? documentRepository.findById(documentId)
+                : documentRepository.findPublishedById(documentId)).orElse(null);
+        if (document == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(DocumentResponse.from(document));
     }
 
     @GetMapping("/{id}/file")
-    public ResponseEntity<byte[]> downloadFile(@PathVariable String id) {
-        Document document = documentRepository.findById(DocumentId.of(id)).orElse(null);
+    public ResponseEntity<byte[]> downloadFile(@PathVariable String id, Authentication authentication) {
+        DocumentId documentId = DocumentId.of(id);
+        Document document = (isPrivileged(authentication)
+                ? documentRepository.findById(documentId)
+                : documentRepository.findPublishedById(documentId)).orElse(null);
         if (document == null) {
             return ResponseEntity.notFound().build();
         }
 
-        byte[] compressedBytes = Base64.getDecoder().decode(document.getFileData());
-        byte[] fileBytes       = decompress(compressedBytes);
+        byte[] fileBytes = document.getFileStorageKey() != null
+                ? readAll(fileStorage.get(document.getFileStorageKey()))
+                : decompress(Base64.getDecoder().decode(document.getFileData()));
         String fileName        = sanitizeFileName(document.getFileName());
 
         MediaType mediaType = detectMediaType(fileName);
@@ -122,6 +135,12 @@ public class DocumentController {
         return ResponseEntity.noContent().build();
     }
 
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR")
+                            || a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     private static byte[] decompress(byte[] compressed) {
         try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(compressed));
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -133,6 +152,15 @@ public class DocumentController {
             return baos.toByteArray();
         } catch (Exception e) {
             throw new IllegalStateException("Error al descomprimir el documento", e);
+        }
+    }
+
+    private static byte[] readAll(InputStream input) {
+        try (InputStream in = input; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            in.transferTo(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            throw new IllegalStateException("Error al descargar el documento", e);
         }
     }
 

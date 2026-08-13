@@ -23,6 +23,8 @@ public class QuotaJpaEntity {
     @Enumerated(EnumType.STRING) @Column(name = "payment_source", length = 10) private PaymentSourceJpa paymentSource;
     @Column(name = "paid_by_user_id", length = 36) private String paidByUserId;
     @Column(name = "payment_reference", length = 255) private String paymentReference;
+    @Column(name = "stripe_session_id", length = 255, unique = true) private String stripeSessionId;
+    @Column(name = "stripe_session_url", length = 2048) private String stripeSessionUrl;
     @Column(name = "created_at", nullable = false) private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
     public enum AgeCategoryJpa { SUB_JUNIOR, JUNIOR, YOUTH, SENIOR, MASTERS, GRAND_MASTERS, SENIOR_GRAND_MASTERS }
