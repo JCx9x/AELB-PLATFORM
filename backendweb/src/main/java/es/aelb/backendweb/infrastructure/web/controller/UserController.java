@@ -181,6 +181,21 @@ public class UserController {
         return ResponseEntity.ok(UserResponse.from(updated));
     }
 
+    /**
+     * Gestión de perfil para GESTOR/ADMIN. Deliberadamente no acepta role ni
+     * blocked: esos campos solo se pueden modificar mediante /{id}/admin.
+     */
+    @PutMapping("/{id}/management")
+    public ResponseEntity<UserResponse> managementUpdate(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateProfileRequest req
+    ) {
+        User updated = updateProfileUseCase.execute(
+                new UpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone(), req.birthDate())
+        );
+        return ResponseEntity.ok(UserResponse.from(updated));
+    }
+
     @PutMapping("/{id}/password")
     public ResponseEntity<Void> changePassword(
             @PathVariable String id,

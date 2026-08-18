@@ -92,6 +92,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET,    "/api/championships/all").hasAnyRole("GESTOR", "ADMIN")
                         // Ver inscripciones de un campeonato → solo gestores
                         .requestMatchers(HttpMethod.GET,    "/api/championships/*/registrations").hasAnyRole("GESTOR", "ADMIN")
+                        // El PDF contiene datos personales (incluido el DNI) → nunca público
+                        .requestMatchers(HttpMethod.GET,    "/api/championships/*/registrations/pdf").hasAnyRole("GESTOR", "ADMIN")
                         // Listado y detalle de campeonatos visibles → público
                         .requestMatchers(HttpMethod.GET,    "/api/championships", "/api/championships/**").permitAll()
                         // Inscribirse en un campeonato → requiere login
@@ -143,7 +145,10 @@ public class SecurityConfig {
                         // ── Usuarios ─────────────────────────────────────────────────
                         // Rutas admin más específicas ANTES que las generales
                         .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,    "/api/users/*/admin").hasAnyRole("ADMIN", "GESTOR")
+                        // Cambios de rol/bloqueo: solo ADMIN. GESTOR usa /management,
+                        // que no acepta campos privilegiados.
+                        .requestMatchers(HttpMethod.PUT,    "/api/users/*/admin").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,    "/api/users/*/management").hasAnyRole("GESTOR", "ADMIN")
                         .requestMatchers(HttpMethod.GET,    "/api/users/*/registrations").authenticated()
                         .requestMatchers(HttpMethod.GET,    "/api/users").hasAnyRole("GESTOR", "ADMIN")
                         // El controlador aplica ownership para /{id}; gestores y admins pueden ver cualquiera.
