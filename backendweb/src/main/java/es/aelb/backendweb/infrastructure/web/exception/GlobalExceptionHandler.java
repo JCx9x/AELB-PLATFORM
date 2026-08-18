@@ -7,6 +7,8 @@ import es.aelb.backendweb.application.registration.RegisterForChampionshipUseCas
 import es.aelb.backendweb.application.user.ChangePasswordUseCase;
 import es.aelb.backendweb.application.user.LoginUseCase;
 import es.aelb.backendweb.application.user.UpdateProfileUseCase;
+import es.aelb.backendweb.application.user.ResetPasswordUseCase;
+import es.aelb.backendweb.application.user.VerifyEmailUseCase;
 import es.aelb.backendweb.domain.category.Category;
 import es.aelb.backendweb.domain.championship.Championship;
 import es.aelb.backendweb.domain.news.News;
@@ -123,6 +125,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ProblemDetail handleIllegalArgument(IllegalArgumentException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler({ResetPasswordUseCase.InvalidResetTokenException.class, VerifyEmailUseCase.InvalidVerificationTokenException.class})
+    public ProblemDetail handleInvalidEmailToken(RuntimeException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

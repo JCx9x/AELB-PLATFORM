@@ -28,6 +28,7 @@ public class User extends AggregateRoot<UserId> {
     private       LocalDate     birthDate;
     private       UserRole      role;
     private       boolean       blocked;
+    private       boolean       emailVerified;
     private       String        teamId;
     private       int           tokenVersion;
     private final LocalDateTime createdAt;
@@ -94,12 +95,13 @@ public class User extends AggregateRoot<UserId> {
             String firstName, String lastName, Dni dni,
             String phone, String city, String province, String nationality,
             LocalDate birthDate, UserRole role,
-            boolean blocked, String teamId, int tokenVersion,
+            boolean blocked, boolean emailVerified, String teamId, int tokenVersion,
             LocalDateTime createdAt, LocalDateTime updatedAt
     ) {
         User user = new User(id, email, passwordHash, firstName, lastName,
                 dni, phone, city, province, nationality, birthDate, role, tokenVersion, createdAt);
         user.blocked   = blocked;
+        user.emailVerified = emailVerified;
         user.teamId    = teamId;
         user.updatedAt = updatedAt;
         return user;
@@ -166,6 +168,9 @@ public class User extends AggregateRoot<UserId> {
     public boolean isActive() {
         return !blocked;
     }
+
+    public boolean isEmailVerified() { return emailVerified; }
+    public void verifyEmail() { this.emailVerified = true; this.updatedAt = LocalDateTime.now(); }
 
     private static void validateName(String name, String field) {
         if (name == null || name.isBlank()) {

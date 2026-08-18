@@ -15,7 +15,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import java.net.URI;
 
 @Configuration
-@EnableConfigurationProperties({StorageProperties.class, StripeProperties.class})
+@EnableConfigurationProperties({StorageProperties.class, StripeProperties.class, EmailProperties.class})
 public class S3Config {
 
     @Bean

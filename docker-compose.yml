@@ -10,6 +10,21 @@ volumes:
 
 services:
 
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: aelb-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - aelb-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # -----------------------------------------------------------
   # MySQL 8
   # -----------------------------------------------------------
@@ -94,6 +109,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
     environment:
       DB_HOST:        mysql
       DB_PORT:        ${DB_PORT:-3306}
@@ -120,6 +137,19 @@ services:
       STRIPE_CURRENCY:           ${STRIPE_CURRENCY:-eur}
       STRIPE_SUCCESS_URL:        ${STRIPE_SUCCESS_URL:-http://localhost:3000/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}}
       STRIPE_CANCEL_URL:         ${STRIPE_CANCEL_URL:-http://localhost:3000/perfil?stripe=cancelled}
+      APP_ENV:                   local
+      EMAIL_PROVIDER:             smtp
+      EMAIL_WORKER_ENABLED:       ${EMAIL_WORKER_ENABLED:-true}
+      EMAIL_MAX_PER_SECOND:       ${EMAIL_MAX_PER_SECOND:-10}
+      EMAIL_WORKER_CONCURRENCY:   ${EMAIL_WORKER_CONCURRENCY:-1}
+      EMAIL_BATCH_SIZE:           ${EMAIL_BATCH_SIZE:-10}
+      EMAIL_MAX_RETRIES:          ${EMAIL_MAX_RETRIES:-5}
+      EMAIL_FROM:                 ${EMAIL_FROM:-noreply@localhost.test}
+      EMAIL_FROM_NAME:            ${EMAIL_FROM_NAME:-AELB}
+      SMTP_HOST:                  mailpit
+      SMTP_PORT:                  1025
+      FRONTEND_PUBLIC_URL:        ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+      EMAIL_TOKEN_ENCRYPTION_KEY: ${EMAIL_TOKEN_ENCRYPTION_KEY:-local-only-change-me}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     networks:

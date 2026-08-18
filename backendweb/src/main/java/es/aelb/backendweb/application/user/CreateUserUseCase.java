@@ -6,6 +6,8 @@ import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.Dni;
 import es.aelb.backendweb.domain.user.valueobject.Email;
 import es.aelb.backendweb.domain.shared.exception.DomainException;
+import es.aelb.backendweb.application.email.EmailService;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Caso de uso: registro de nuevo usuario.
@@ -20,13 +22,17 @@ public class CreateUserUseCase implements UseCase<CreateUserCommand, String> {
 
     private final UserRepository    userRepository;
     private final PasswordEncoder   passwordEncoder;
+    private final EmailService emailService;
 
-    public CreateUserUseCase(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public CreateUserUseCase(UserRepository userRepository, PasswordEncoder passwordEncoder, EmailService emailService) {
         this.userRepository  = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
+    public CreateUserUseCase(UserRepository userRepository, PasswordEncoder passwordEncoder) { this(userRepository, passwordEncoder, EmailService.NOOP); }
 
     @Override
+    @Transactional
     public String execute(CreateUserCommand cmd) {
         Email email = Email.of(cmd.email());
         Dni   dni   = Dni.of(cmd.dni());
@@ -52,6 +58,7 @@ public class CreateUserUseCase implements UseCase<CreateUserCommand, String> {
         );
 
         userRepository.save(user);
+        emailService.requestEmailVerification(user);
         return user.getId().value();
     }
 

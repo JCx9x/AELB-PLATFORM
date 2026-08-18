@@ -31,6 +31,7 @@ public class UserJpaMapper {
         entity.setBirthDate(user.getBirthDate());
         entity.setRole(RoleJpa.valueOf(user.getRole().name()));
         entity.setBlocked(user.isBlocked());
+        entity.setEmailVerified(user.isEmailVerified());
         entity.setTeamId(user.getTeamId());
         entity.setTokenVersion(user.getTokenVersion());
         entity.setCreatedAt(user.getCreatedAt());
@@ -53,6 +54,7 @@ public class UserJpaMapper {
                 entity.getBirthDate(),
                 UserRole.valueOf(entity.getRole().name()),
                 entity.isBlocked(),
+                entity.isEmailVerified(),
                 entity.getTeamId(),
                 entity.getTokenVersion(),
                 entity.getCreatedAt(),

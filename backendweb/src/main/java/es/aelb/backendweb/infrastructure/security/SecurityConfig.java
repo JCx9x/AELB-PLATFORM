@@ -78,6 +78,8 @@ public class SecurityConfig {
 
                         // ── Auth y registro ──────────────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password/forgot", "/api/auth/password/reset", "/api/auth/email/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/email/resend-verification").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         // El access token ya puede estar caducado al llamar a /refresh — la
                         // validez real la comprueba RefreshSessionUseCase contra el refresh token.

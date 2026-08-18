@@ -20,6 +20,8 @@ import es.aelb.backendweb.domain.user.User.UserBlockedException;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.domain.shared.exception.DomainException;
+import es.aelb.backendweb.application.email.EmailService;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +49,7 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
     private final QuotaRepository        quotaRepository;
     private final ChampionshipAgeCategoryPriceRepository categoryPriceRepository;
     private final ChampionshipRegistrationPriceCalculator priceCalculator;
+    private final EmailService emailService;
 
     public RegisterForChampionshipUseCase(
             UserRepository userRepository,
@@ -55,7 +58,8 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
             CategoryRepository categoryRepository,
             QuotaRepository quotaRepository,
             ChampionshipAgeCategoryPriceRepository categoryPriceRepository,
-            ChampionshipRegistrationPriceCalculator priceCalculator
+            ChampionshipRegistrationPriceCalculator priceCalculator,
+            EmailService emailService
     ) {
         this.userRepository         = userRepository;
         this.championshipRepository = championshipRepository;
@@ -64,9 +68,12 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
         this.quotaRepository        = quotaRepository;
         this.categoryPriceRepository = categoryPriceRepository;
         this.priceCalculator = priceCalculator;
+        this.emailService = emailService;
     }
+    public RegisterForChampionshipUseCase(UserRepository u, ChampionshipRepository c, RegistrationRepository r, CategoryRepository cr, QuotaRepository q, ChampionshipAgeCategoryPriceRepository p, ChampionshipRegistrationPriceCalculator pc) { this(u,c,r,cr,q,p,pc,EmailService.NOOP); }
 
     @Override
+    @Transactional
     public String execute(RegisterForChampionshipCommand cmd) {
         UserId         userId         = UserId.of(cmd.userId());
         ChampionshipId championshipId = ChampionshipId.of(cmd.championshipId());
@@ -146,6 +153,7 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
 
         Registration registration = Registration.create(userId, championshipId, cmd.categoryId(), newTotal.subtract(previousTotal), registeredById);
         registrationRepository.save(registration);
+        emailService.requestRegistrationConfirmation(user.getEmail().value(), user.getFullName(), registration.getId(), championship.getName());
         return registration.getId();
     }
 

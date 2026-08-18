@@ -45,6 +45,13 @@ import es.aelb.backendweb.application.user.CreateUserUseCase;
 import es.aelb.backendweb.application.user.DeleteUserUseCase;
 import es.aelb.backendweb.application.user.LoginUseCase;
 import es.aelb.backendweb.application.user.UpdateProfileUseCase;
+import es.aelb.backendweb.application.user.RequestPasswordResetUseCase;
+import es.aelb.backendweb.application.user.ResetPasswordUseCase;
+import es.aelb.backendweb.application.user.VerifyEmailUseCase;
+import es.aelb.backendweb.application.user.ResendEmailVerificationUseCase;
+import es.aelb.backendweb.application.email.EmailService;
+import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringPasswordResetTokenJpaRepository;
+import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringEmailVerificationTokenJpaRepository;
 import es.aelb.backendweb.domain.auth.RefreshTokenRepository;
 import es.aelb.backendweb.domain.category.CategoryRepository;
 import es.aelb.backendweb.domain.championship.ChampionshipRepository;
@@ -101,7 +108,7 @@ public class BeanConfiguration {
     public CreateStripeQuotaCheckoutUseCase createStripeQuotaCheckoutUseCase(GetOrCreateUserQuotaUseCase quotas, QuotaRepository quotaRepository, StripeCheckoutGateway gateway) { return new CreateStripeQuotaCheckoutUseCase(quotas, quotaRepository, gateway); }
 
     @Bean
-    public ConfirmStripeQuotaPaymentUseCase confirmStripeQuotaPaymentUseCase(QuotaRepository repository) { return new ConfirmStripeQuotaPaymentUseCase(repository); }
+    public ConfirmStripeQuotaPaymentUseCase confirmStripeQuotaPaymentUseCase(QuotaRepository repository, UserRepository users, EmailService emails) { return new ConfirmStripeQuotaPaymentUseCase(repository, users, emails); }
 
     @Bean
     public CreateStripeRegistrationCheckoutUseCase createStripeRegistrationCheckoutUseCase(RegistrationRepository registrations, RegistrationCheckoutRepository checkouts, CategoryRepository categories, StripeCheckoutGateway stripe) {
@@ -109,8 +116,8 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public ConfirmStripeRegistrationPaymentUseCase confirmStripeRegistrationPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository registrations) {
-        return new ConfirmStripeRegistrationPaymentUseCase(checkouts, registrations);
+    public ConfirmStripeRegistrationPaymentUseCase confirmStripeRegistrationPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository registrations, UserRepository users, ChampionshipRepository championships, EmailService emails) {
+        return new ConfirmStripeRegistrationPaymentUseCase(checkouts, registrations, users, championships, emails);
     }
 
     @Bean
@@ -119,8 +126,8 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public ConfirmStripeChampionshipBasketPaymentUseCase confirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository repository) {
-        return new ConfirmStripeChampionshipBasketPaymentUseCase(checkouts, repository);
+    public ConfirmStripeChampionshipBasketPaymentUseCase confirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository repository, UserRepository users, ChampionshipRepository championships, EmailService emails) {
+        return new ConfirmStripeChampionshipBasketPaymentUseCase(checkouts, repository, users, championships, emails);
     }
 
     @Bean
@@ -134,9 +141,9 @@ public class BeanConfiguration {
     @Bean
     public CreateUserUseCase createUserUseCase(
             UserRepository userRepository,
-            BCryptPasswordEncoder encoder
+            BCryptPasswordEncoder encoder, EmailService emailService
     ) {
-        return new CreateUserUseCase(userRepository, encoder::encode);
+        return new CreateUserUseCase(userRepository, encoder::encode, emailService);
     }
 
     @Bean
@@ -176,6 +183,11 @@ public class BeanConfiguration {
     ) {
         return new ChangePasswordUseCase(userRepository, encoder::matches, encoder::encode);
     }
+
+    @Bean public RequestPasswordResetUseCase requestPasswordResetUseCase(EmailService emails) { return new RequestPasswordResetUseCase(emails); }
+    @Bean public ResetPasswordUseCase resetPasswordUseCase(SpringPasswordResetTokenJpaRepository tokens, UserRepository users, BCryptPasswordEncoder encoder) { return new ResetPasswordUseCase(tokens, users, encoder::encode); }
+    @Bean public VerifyEmailUseCase verifyEmailUseCase(SpringEmailVerificationTokenJpaRepository tokens, UserRepository users) { return new VerifyEmailUseCase(tokens, users); }
+    @Bean public ResendEmailVerificationUseCase resendEmailVerificationUseCase(UserRepository users, EmailService emails) { return new ResendEmailVerificationUseCase(users, emails); }
 
     @Bean
     public UpdateProfileUseCase updateProfileUseCase(UserRepository userRepository) {
@@ -258,8 +270,8 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public UpdatePaymentStatusUseCase updatePaymentStatusUseCase(RegistrationRepository registrationRepository) {
-        return new UpdatePaymentStatusUseCase(registrationRepository);
+    public UpdatePaymentStatusUseCase updatePaymentStatusUseCase(RegistrationRepository registrationRepository, UserRepository users, ChampionshipRepository championships, EmailService emails) {
+        return new UpdatePaymentStatusUseCase(registrationRepository, users, championships, emails);
     }
 
     @Bean
@@ -354,10 +366,11 @@ public class BeanConfiguration {
             CategoryRepository categoryRepository,
             QuotaRepository quotaRepository,
             ChampionshipAgeCategoryPriceRepository categoryPriceRepository,
-            ChampionshipRegistrationPriceCalculator priceCalculator
+            ChampionshipRegistrationPriceCalculator priceCalculator,
+            EmailService emailService
     ) {
         return new RegisterForChampionshipUseCase(
-                userRepository, championshipRepository, registrationRepository, categoryRepository, quotaRepository, categoryPriceRepository, priceCalculator
+                userRepository, championshipRepository, registrationRepository, categoryRepository, quotaRepository, categoryPriceRepository, priceCalculator, emailService
         );
     }
 }

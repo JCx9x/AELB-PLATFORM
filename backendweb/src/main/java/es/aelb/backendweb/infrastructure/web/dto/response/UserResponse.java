@@ -18,6 +18,7 @@ public record UserResponse(
         LocalDate     birthDate,
         String        role,
         boolean       blocked,
+        boolean       emailVerified,
         String        teamId,
         LocalDateTime createdAt
 ) {
@@ -35,6 +36,7 @@ public record UserResponse(
                 user.getBirthDate(),
                 user.getRole().name(),
                 user.isBlocked(),
+                user.isEmailVerified(),
                 user.getTeamId(),
                 user.getCreatedAt()
         );

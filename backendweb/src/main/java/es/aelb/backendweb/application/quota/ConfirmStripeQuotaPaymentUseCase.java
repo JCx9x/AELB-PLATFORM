@@ -4,11 +4,15 @@ import es.aelb.backendweb.domain.quota.Quota;
 import es.aelb.backendweb.domain.quota.QuotaRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
 import org.springframework.transaction.annotation.Transactional;
+import es.aelb.backendweb.application.email.EmailService;
+import es.aelb.backendweb.domain.user.UserRepository;
 
 /** Confirma de forma idempotente el pago recibido en un webhook verificado de Stripe. */
 public class ConfirmStripeQuotaPaymentUseCase {
     private final QuotaRepository repository;
-    public ConfirmStripeQuotaPaymentUseCase(QuotaRepository repository) { this.repository = repository; }
+    private final UserRepository users; private final EmailService emails;
+    public ConfirmStripeQuotaPaymentUseCase(QuotaRepository repository, UserRepository users, EmailService emails) { this.repository = repository; this.users=users;this.emails=emails; }
+    public ConfirmStripeQuotaPaymentUseCase(QuotaRepository repository) { this(repository, null, EmailService.NOOP); }
 
     @Transactional
     public void execute(String userId, int year, String checkoutSessionId, long amountTotalInCents) {
@@ -32,6 +36,7 @@ public class ConfirmStripeQuotaPaymentUseCase {
         if (!quota.isPaid()) {
             quota.markAsPaidByStripe(checkoutSessionId);
             repository.save(quota);
+            if (users != null) users.findById(quota.getUserId()).ifPresent(user -> emails.requestPaymentConfirmation(user.getEmail().value(), user.getFullName(), quota.getId(), "Cuota anual " + quota.getYear(), quota.getAmount().toPlainString() + " EUR"));
         }
     }
 

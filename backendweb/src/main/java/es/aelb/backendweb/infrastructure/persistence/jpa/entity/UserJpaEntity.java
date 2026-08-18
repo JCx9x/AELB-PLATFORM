@@ -60,6 +60,9 @@ public class UserJpaEntity {
     @Column(name = "is_blocked", nullable = false)
     private boolean blocked;
 
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified;
+
     @Column(name = "team_id", length = 36)
     private String teamId;
 

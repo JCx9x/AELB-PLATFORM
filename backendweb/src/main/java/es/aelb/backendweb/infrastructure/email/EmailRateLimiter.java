@@ -1,0 +1,3 @@
+package es.aelb.backendweb.infrastructure.email;
+import es.aelb.backendweb.infrastructure.config.EmailProperties; import org.springframework.stereotype.Component; import java.util.concurrent.atomic.AtomicLong;
+@Component public class EmailRateLimiter {private final EmailProperties p;private final AtomicLong next= new AtomicLong(); public EmailRateLimiter(EmailProperties p){this.p=p;} public boolean tryAcquire(){long now=System.nanoTime();long interval=1_000_000_000L/Math.max(1,p.getMaxPerSecond());while(true){long current=next.get();long at=Math.max(now,current);if(at>now)return false;if(next.compareAndSet(current,at+interval))return true;}}}

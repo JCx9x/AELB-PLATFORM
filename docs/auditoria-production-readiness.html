@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><title>Auditoría de software y production readiness — AELB</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font-family: Arial, sans-serif; color:#202124; font-size:10pt; line-height:1.4; }
+h1 { color:#153b63; font-size:24pt; margin-bottom:4px; } h2 { color:#153b63; border-bottom:1px solid #b9c8d8; padding-bottom:3px; margin-top:22px; } h3 { color:#7a1f1f; margin-bottom:3px; }
+.subtitle { color:#5f6368; font-size:12pt; } .verdict { background:#f8d7da; border-left:6px solid #b42318; padding:12px; font-size:16pt; font-weight:bold; margin:16px 0; }
+.score { background:#eef5fb; border:1px solid #b9c8d8; padding:10px; font-size:16pt; font-weight:bold; }
+table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:8.5pt; } th { background:#153b63; color:white; } th,td { border:1px solid #c8cdd3; padding:5px; vertical-align:top; } tr:nth-child(even) td { background:#f6f8fa; }
+.critical { color:#a40000; font-weight:bold; } .high { color:#c04a00; font-weight:bold; } .medium { color:#806000; font-weight:bold; } .small { font-size:8.5pt; color:#4d5156; }
+code { font-family:monospace; font-size:9pt; background:#f1f3f4; padding:1px 3px; } ul { margin-top:4px; } .pagebreak { page-break-before:always; }
+</style></head>
+<body>
+<h1>Auditoría completa de software y production readiness</h1>
+<div class="subtitle">Repositorio AELB · 18 de agosto de 2026</div>
+<div class="verdict">🔴 NO LISTO PARA PRODUCCIÓN</div>
+<p><b>Conclusión ejecutiva.</b> La arquitectura base es razonable para una aplicación pequeña, pero existen fallos confirmados de autorización y despliegue que deben impedir la puesta en producción. Los riesgos más graves son la posible exposición de PDFs con datos personales, la escalada de GESTOR a ADMIN, el uso de configuración local/insegura en Docker y la falta de garantías operativas para pagos, migraciones, observabilidad y recuperación.</p>
+<div class="score">PRODUCTION READINESS: 42/100</div>
+
+<h2>1. Alcance y método</h2>
+<p>Se inspeccionaron estructura, código Java y TypeScript, configuración, Docker, SQL, migraciones, seguridad, Stripe, frontend, tests, dependencias, documentación y estado del repositorio. No se modificó código de la aplicación. El árbol ya contenía cambios previos en <code>aelb-frontend/app/lib/api.ts</code>, <code>package.json</code> y <code>package-lock.json</code>.</p>
+
+<h2>2. Arquitectura detectada</h2>
+<ul><li>Frontend: Next.js 16.3, React 19, TypeScript.</li><li>Backend: Spring Boot 4.0.6, Java 21, Spring Security, JPA/Hibernate.</li><li>Base de datos: MySQL 8.4.</li><li>Almacenamiento: S3/MinIO con URLs presignadas.</li><li>Pagos: Stripe Checkout y webhooks firmados.</li><li>Autenticación: JWT en cookies HttpOnly, refresh tokens rotatorios y CSRF.</li><li>Roles: USER, GESTOR y ADMIN.</li><li>Migraciones: scripts SQL manuales; sin Flyway/Liquibase.</li><li>Email, WebSockets y CI/CD: no detectados.</li><li>Health checks: MySQL/MinIO en Compose; no backend propio.</li></ul>
+
+<h2>3. Bloqueantes para producción</h2>
+<h3 class="critical">[CRITICAL] C-01 — PDF de inscripciones accesible públicamente</h3>
+<p><b>Ubicación:</b> <code>SecurityConfig.java:94-96</code>, <code>RegistrationController.java:198-214</code>.</p><p>El matcher protegido cubre <code>/registrations</code>, pero no <code>/registrations/pdf</code>. La ruta cae en <code>GET /api/championships/**.permitAll()</code>. El PDF contiene nombres y DNI.</p><p><b>Solución:</b> añadir antes del matcher público <code>/api/championships/*/registrations/pdf</code> con <code>hasAnyRole("GESTOR","ADMIN")</code> y test anónimo 401.</p>
+<h3 class="critical">[CRITICAL] C-02 — Un GESTOR puede convertir usuarios en ADMIN</h3>
+<p><b>Ubicación:</b> <code>SecurityConfig.java:145-150</code>, <code>UserController.java:164-180</code>, <code>AdminUpdateUserUseCase.java:18-38</code>.</p><p><code>/api/users/{id}/admin</code> permite GESTOR y ADMIN; el caso de uso acepta <code>role=ADMIN</code>. Esto permite compromiso total de la aplicación.</p><p><b>Solución:</b> solo ADMIN puede cambiar roles; crear endpoint separado para que GESTOR edite únicamente datos no privilegiados.</p>
+<h3 class="critical">[CRITICAL] C-03 — Compose de producción activa configuración local</h3>
+<p><b>Ubicación:</b> <code>docker-compose.yml:103-122</code>, <code>application.properties:28-53</code>.</p><p>Se fuerza el perfil <code>local</code>, cookies Secure por defecto a false, MinIO con credenciales estáticas, URLs HTTP/localhost, puertos publicados e imágenes <code>latest</code>. Desplegar este Compose sin sobrescribir todo produce una instalación insegura o rota.</p><p><b>Solución:</b> separar Compose dev/prod, usar HTTPS, IAM/S3, secretos externos, imágenes fijadas y no publicar MySQL/MinIO.</p>
+
+<h2>4. Hallazgos HIGH</h2>
+<h3>[HIGH] H-01 — Migraciones manuales</h3><p><b>Ubicación:</b> <code>database/migrations/</code>, documentación de despliegue.</p><p>Hibernate valida pero no migra. No hay control de versión aplicado en la base, rollback ni pipeline. Un despliegue puede arrancar con esquema incompleto.</p><p><b>Solución:</b> adoptar Flyway/Liquibase y convertir los scripts en migraciones controladas.</p>
+<h3>[HIGH] H-02 — Pago confirmado sin inscripción materializada</h3><p><b>Ubicación:</b> <code>ConfirmStripeChampionshipBasketPaymentUseCase.java:14-27</code>, <code>RegisterForChampionshipUseCase.java:85-105</code>.</p><p>El webhook crea la inscripción después del pago. Si el campeonato cierra o cambia la elegibilidad antes del webhook, Stripe puede haber cobrado y la inscripción ser rechazada.</p><p><b>Solución:</b> reservar/validar la inscripción al crear checkout y materializar esa reserva en el webhook.</p>
+<h3>[HIGH] H-03 — Webhook de cuota sin comprobar session ID</h3><p><b>Ubicación:</b> <code>ConfirmStripeQuotaPaymentUseCase.java:12-18</code>.</p><p>Se usa user/año del metadata, pero no se valida contra <code>quota.stripe_session_id</code>. Tampoco hay transacción ni lock explícito.</p><p><b>Solución:</b> localizar por session ID, validar usuario/año/importe y confirmar con lock dentro de transacción.</p>
+<h3>[HIGH] H-04 — Uploads sin límites suficientes</h3><p><b>Ubicación:</b> <code>StorageController.java:25-38</code> y DTOs de documentos/resultados.</p><p>No hay límite de tamaño, validación de magic bytes ni lista blanca estricta de carpetas/tipos. Base64 puede provocar consumo elevado de memoria y almacenamiento.</p><p><b>Solución:</b> límites de API/S3, MIME real, extensiones permitidas y presigned POST con <code>content-length-range</code>.</p>
+<h3>[HIGH] H-05 — Sin recuperación de contraseña ni emails</h3><p>No hay password reset, verificación de email ni notificaciones de pago/inscripción. Un usuario que pierda la contraseña queda bloqueado.</p>
+<h3>[HIGH] H-06 — Errores de Stripe silenciosos</h3><p><b>Ubicación:</b> <code>StripeWebhookController.java:49</code>.</p><p>Se captura cualquier excepción y se devuelve 400 sin registrar evento, checkout, session, causa ni correlation ID. Un pago fallido queda difícil de diagnosticar.</p>
+<h3>[HIGH] H-07 — Sin CI/CD</h3><p>No se detecta pipeline para build, tests, lint, dependencias, imágenes, migraciones ni smoke tests.</p>
+<h3>[HIGH] H-08 — Frontend no pasa lint</h3><p><code>npm run lint</code> devuelve 16 errores y 22 warnings, principalmente por <code>setState</code> síncrono desde <code>useEffect</code> en páginas administrativas, Navbar y Perfil.</p>
+
+<h2>5. Hallazgos MEDIUM</h2>
+<ul><li><b>M-01:</b> no existe capacidad/aforo en el modelo de campeonato; no se puede impedir superar plazas.</li><li><b>M-02:</b> registros usan read-check-write sin lock; la base protege duplicados exactos, pero no máximos/reglas concurrentes.</li><li><b>M-03:</b> no hay CSP, HSTS ni Referrer-Policy explícitos.</li><li><b>M-04:</b> rate limiter en memoria; no es global con varias réplicas.</li><li><b>M-05:</b> usuarios se cargan completos y se pagina en memoria; existen consultas dentro de streams.</li><li><b>M-06:</b> contenidos y Base64 carecen de límites homogéneos.</li><li><b>M-07:</b> borrado de usuarios puede chocar con foreign keys y no hay política clara de anonimización.</li><li><b>M-08:</b> <code>npm audit --omit=dev</code> detecta vulnerabilidad HIGH transitoria en <code>nanoid</code>, con actualización disponible.</li></ul>
+
+<h2>6. Seguridad positiva observada</h2>
+<ul><li>JWT firmado con secreto mínimo y comprobación de versión de sesión.</li><li>Refresh tokens almacenados como hash y rotatorios.</li><li>Cookies HttpOnly y CSRF mediante cookie/header.</li><li>CORS con lista de orígenes configurada, no wildcard por defecto.</li><li>Webhook Stripe con firma y timestamp.</li><li>Precio calculado en backend.</li><li>Éxito de Stripe no marca el pago por sí mismo.</li><li>Checkouts con claves de idempotencia.</li><li>Contenido no publicado filtrado en controladores de noticias, campeonatos, resultados y documentos.</li><li>Contraseñas con BCrypt y backend Docker no-root.</li></ul>
+
+<div class="pagebreak"></div><h2>7. Base de datos, pagos y concurrencia</h2>
+<p>El esquema tiene claves foráneas, unicidad de usuarios, cuotas y registros, restricciones de importes y checkouts con claves únicas. Hibernate está en <code>validate</code>. Esto es positivo, pero la integridad operativa depende de aplicar correctamente las migraciones.</p>
+<p>Las cuotas tienen lock pesimista en el repositorio, pero la confirmación Stripe no lo utiliza. Las inscripciones tienen unicidad por usuario/campeonato/categoría, pero no existe lock para reglas de máximo, turnos o aforo.</p>
+<p>Stripe implementa timeout, retry y circuit breaker básicos, pero la confirmación de negocio y la observabilidad todavía no son suficientes para pagos reales.</p>
+
+<h2>8. Tests y verificación</h2>
+<table><tr><th>Tipo</th><th>Estado</th></tr><tr><td>Unitarios de dominio</td><td>Parciales</td></tr><tr><td>Seguridad JWT/autorización</td><td>Algunos tests</td></tr><tr><td>Integración API/JPA</td><td>Muy limitada</td></tr><tr><td>Stripe/webhooks</td><td>No detectados</td></tr><tr><td>Concurrencia/uploads/migraciones</td><td>No detectados</td></tr><tr><td>E2E frontend</td><td>No existe</td></tr></table>
+<p>Maven no pudo ejecutarse por permisos del <code>target/classes</code> preexistente. El build Next.js quedó bloqueado por una restricción del sandbox al crear procesos de Turbopack; no se clasifica como fallo confirmado de la aplicación.</p>
+
+<h2>9. Operación y resiliencia</h2>
+<ul><li>No hay health/readiness propio del backend.</li><li>No hay graceful shutdown explícito.</li><li>No hay correlation ID ni logging estructurado suficiente.</li><li>No hay alertas para 5xx, inscripciones fallidas o Stripe.</li><li>No hay backup/restore automatizado ni restauración probada.</li><li>No hay procedimiento formal de rollback.</li><li>Se requiere backup de MySQL y objetos S3/MinIO.</li></ul>
+
+<h2>10. Tabla resumen</h2>
+<table><tr><th>ID</th><th>Severidad</th><th>Área</th><th>Problema</th><th>Bloquea</th></tr>
+<tr><td>C-01</td><td class="critical">CRITICAL</td><td>Autorización</td><td>PDF de inscripciones fuera del matcher protegido</td><td>Sí</td></tr>
+<tr><td>C-02</td><td class="critical">CRITICAL</td><td>Autorización</td><td>GESTOR puede promover a ADMIN</td><td>Sí</td></tr>
+<tr><td>C-03</td><td class="critical">CRITICAL</td><td>Deployment</td><td>Compose local, HTTP y defaults inseguros</td><td>Sí</td></tr>
+<tr><td>H-01</td><td class="high">HIGH</td><td>DB</td><td>Migraciones manuales</td><td>Sí</td></tr>
+<tr><td>H-02</td><td class="high">HIGH</td><td>Pagos</td><td>Pago Stripe sin inscripción materializada</td><td>Sí</td></tr>
+<tr><td>H-03</td><td class="high">HIGH</td><td>Pagos</td><td>Webhook de cuota sin session binding</td><td>Sí</td></tr>
+<tr><td>H-04</td><td class="high">HIGH</td><td>Uploads</td><td>Sin límites de tamaño/tipo suficientes</td><td>Sí</td></tr>
+<tr><td>H-05</td><td class="high">HIGH</td><td>Auth</td><td>Sin password reset/emails</td><td>Recomendado</td></tr>
+<tr><td>H-06</td><td class="high">HIGH</td><td>Observabilidad</td><td>Webhook silencia excepciones</td><td>Sí</td></tr>
+<tr><td>H-07</td><td class="high">HIGH</td><td>CI/CD</td><td>No existe pipeline</td><td>Sí</td></tr>
+<tr><td>H-08</td><td class="high">HIGH</td><td>Frontend</td><td>Lint falla</td><td>Sí</td></tr>
+<tr><td>M-01</td><td class="medium">MEDIUM</td><td>Negocio</td><td>No hay aforo modelado</td><td>Según negocio</td></tr>
+<tr><td>M-02</td><td class="medium">MEDIUM</td><td>Concurrencia</td><td>Registro sin lock completo</td><td>Riesgo</td></tr>
+<tr><td>M-03–M-08</td><td class="medium">MEDIUM</td><td>Operación/seguridad</td><td>Headers, rate limit, paginación, límites, borrado y dependencia npm</td><td>No</td></tr></table>
+
+<h2>11. Production readiness score</h2>
+<table><tr><th>Área</th><th>Puntuación</th><th>Motivo principal</th></tr><tr><td>Seguridad</td><td>4/10</td><td>Fallos críticos de autorización</td></tr><tr><td>Fiabilidad</td><td>4/10</td><td>Pagos y operación incompletos</td></tr><tr><td>Base de datos</td><td>6/10</td><td>Buen esquema, migraciones manuales</td></tr><tr><td>Arquitectura</td><td>7/10</td><td>Separación por dominio razonable</td></tr><tr><td>Calidad de código</td><td>5/10</td><td>Deuda y lint frontend</td></tr><tr><td>Tests</td><td>2/10</td><td>Sin API, Stripe, concurrencia ni E2E</td></tr><tr><td>Observabilidad</td><td>2/10</td><td>Sin health, alertas ni trazabilidad</td></tr><tr><td>Configuración</td><td>3/10</td><td>Defaults locales en Compose</td></tr><tr><td>Deployment</td><td>3/10</td><td>Sin CI/CD ni migraciones automatizadas</td></tr><tr><td>Mantenibilidad</td><td>6/10</td><td>Arquitectura clara, operación incompleta</td></tr></table>
+
+<h2>12. Plan de acción</h2>
+<h3>FASE 1 — Bloqueantes</h3><p>Corregir <code>SecurityConfig</code>, <code>UserController</code>, <code>AdminUpdateUserUseCase</code>, autorización del PDF y separar Compose dev/prod. Dificultad baja-media. Sin migración salvo política de usuarios. Tests API de roles, ownership y escalada.</p>
+<h3>FASE 2 — Seguridad</h3><p>Limitar uploads, MIME, carpetas, tamaño, CSP, HSTS y rate limiting distribuido. Dificultad media. Tests de payloads, CORS, CSRF y headers.</p>
+<h3>FASE 3 — Fiabilidad</h3><p>Corregir casos Stripe, session binding, transacciones, reservas e idempotencia. Dificultad alta. Probable migración para eventos Stripe/reservas. Tests de reintentos, retrasos, duplicados y concurrencia.</p>
+<h3>FASE 4 — Tests</h3><p>Añadir MockMvc, IDOR/BOLA, publicación, Stripe, migraciones, uploads, errores HTTP, concurrencia y E2E de login/inscripción/pago.</p>
+<h3>FASE 5 — Observabilidad</h3><p>Health liveness/readiness, correlation ID, logs estructurados, métricas 5xx/Stripe/inscripciones y alertas.</p>
+<h3>FASE 6 — Deployment</h3><p>CI/CD, imágenes fijadas, Flyway/Liquibase, healthchecks, graceful shutdown, backups MySQL/S3, restauración probada y rollback.</p>
+<h3>FASE 7 — Posterior</h3><p>Password reset, emails, paginación SQL, anonimización, Redis, optimización N+1, E2E completo y retirada de columnas Base64 legacy.</p>
+
+<h2>13. Veredicto final</h2>
+<div class="verdict">🔴 NO LISTO PARA PRODUCCIÓN</div>
+<p>La aplicación puede evolucionar hacia producción sin una reescritura arquitectónica, pero no debe desplegarse hasta resolver C-01, C-02 y C-03, y preferiblemente H-01 a H-08. El riesgo de incidente más probable es una combinación de autorización incorrecta, exposición de datos personales, despliegue con configuración local y un pago Stripe que no se refleje correctamente en la inscripción.</p>
+</body></html>
