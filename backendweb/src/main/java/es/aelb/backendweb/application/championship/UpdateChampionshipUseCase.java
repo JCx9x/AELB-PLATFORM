@@ -3,6 +3,7 @@ package es.aelb.backendweb.application.championship;
 import es.aelb.backendweb.domain.championship.Championship;
 import es.aelb.backendweb.domain.championship.ChampionshipRepository;
 import es.aelb.backendweb.domain.championship.valueobject.ChampionshipId;
+import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -26,6 +27,7 @@ public class UpdateChampionshipUseCase {
         } else if (cmd.imageKey().isEmpty()) {
             imageUrl = null;
         } else {
+            if (!StoredFileKeys.isAllowedImageKey(cmd.imageKey(), "championships")) throw new IllegalArgumentException("La imagen del campeonato no es válida");
             imageUrl = cmd.imageKey();
         }
 

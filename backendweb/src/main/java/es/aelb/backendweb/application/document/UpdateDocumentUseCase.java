@@ -6,7 +6,7 @@ import es.aelb.backendweb.domain.document.valueobject.DocumentId;
 import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
-import java.util.Base64;
+import es.aelb.backendweb.infrastructure.storage.FileUploadValidator;
 
 public class UpdateDocumentUseCase {
 
@@ -25,7 +25,7 @@ public class UpdateDocumentUseCase {
         document.update(cmd.title(), cmd.description());
 
         if (cmd.fileBase64() != null && !cmd.fileBase64().isBlank()) {
-            byte[] rawBytes      = Base64.getDecoder().decode(cmd.fileBase64());
+            byte[] rawBytes      = FileUploadValidator.decodeDocument(cmd.fileBase64(), cmd.fileName());
             long   originalSize  = rawBytes.length;
             String storageKey = StoredFileKeys.document(document.getId().value(), cmd.fileName());
             fileStorage.put(storageKey, rawBytes, StoredFileKeys.contentType(cmd.fileName()));

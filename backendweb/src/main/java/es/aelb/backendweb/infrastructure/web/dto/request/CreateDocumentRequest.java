@@ -13,9 +13,11 @@ public record CreateDocumentRequest(
         String description,
 
         @NotBlank(message = "El archivo no puede estar vacío")
+        @Size(max = 14000000, message = "El documento supera el tamaño máximo permitido")
         String fileBase64,
 
         @NotBlank(message = "El nombre del archivo no puede estar vacío")
+        @Size(max = 255, message = "El nombre del archivo no puede superar los 255 caracteres")
         String fileName,
 
         @NotNull

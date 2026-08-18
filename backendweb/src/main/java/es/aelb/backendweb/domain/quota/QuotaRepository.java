@@ -10,6 +10,7 @@ public interface QuotaRepository {
     void            save(Quota quota);
     Optional<Quota> findByUserAndYear(UserId userId, int year);
     Optional<Quota> findByUserAndYearForUpdate(UserId userId, int year);
+    Optional<Quota> findByStripeSessionIdForUpdate(String stripeSessionId);
     boolean         existsByUserAndYear(UserId userId, int year);
     List<Quota>     findByUser(UserId userId);
     List<String>     findPaidUserIdsByYear(int year);

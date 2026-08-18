@@ -25,6 +25,13 @@ public final class StoredFileKeys {
         return "application/octet-stream";
     }
 
+    public static boolean isAllowedImageKey(String key, String folder) {
+        if (key == null || key.isBlank() || folder == null || !key.startsWith(folder + "/")) return false;
+        String remainder = key.substring(folder.length() + 1);
+        return !remainder.isBlank() && !remainder.contains("..")
+                && remainder.matches("[A-Za-z0-9-]+\\.(jpg|jpeg|png|webp|gif)" );
+    }
+
     private static String safeFileName(String fileName, String fallback) {
         if (fileName == null || fileName.isBlank()) return fallback;
         return fileName.replaceAll("[^A-Za-z0-9._-]", "_");

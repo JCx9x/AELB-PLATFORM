@@ -12,7 +12,9 @@ public record UpdateResultRequest(
 
         String description,
 
+        @Size(max = 28000000, message = "El PDF supera el tamaño máximo permitido")
         String pdfBase64,   // null = keep existing PDF; el backend lo almacena en S3
+        @Size(max = 255, message = "El nombre del archivo no puede superar los 255 caracteres")
         String pdfFileName, // null = keep existing file name
 
         @NotNull

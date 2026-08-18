@@ -19,6 +19,7 @@ import es.aelb.backendweb.domain.shared.exception.DomainException;
 import es.aelb.backendweb.domain.user.User;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +31,8 @@ import java.util.*;
 public class CreateStripeChampionshipBasketCheckoutUseCase {
     private final UserRepository users; private final ChampionshipRepository championships; private final CategoryRepository categories;
     private final QuotaRepository quotas; private final ChampionshipAgeCategoryPriceRepository prices;
-    private final ChampionshipRegistrationPriceCalculator calculator; private final RegistrationCheckoutRepository checkouts; private final StripeCheckoutGateway stripe; private final RegistrationRepository registrations;
-    public CreateStripeChampionshipBasketCheckoutUseCase(UserRepository users, ChampionshipRepository championships, CategoryRepository categories, QuotaRepository quotas, ChampionshipAgeCategoryPriceRepository prices, ChampionshipRegistrationPriceCalculator calculator, RegistrationCheckoutRepository checkouts, StripeCheckoutGateway stripe, RegistrationRepository registrations) { this.users = users; this.championships = championships; this.categories = categories; this.quotas = quotas; this.prices = prices; this.calculator = calculator; this.checkouts = checkouts; this.stripe = stripe; this.registrations = registrations; }
+    private final ChampionshipRegistrationPriceCalculator calculator; private final RegistrationCheckoutRepository checkouts; private final StripeCheckoutGateway stripe; private final RegistrationRepository registrations; private final RegisterForChampionshipUseCase registerForChampionship;
+    public CreateStripeChampionshipBasketCheckoutUseCase(UserRepository users, ChampionshipRepository championships, CategoryRepository categories, QuotaRepository quotas, ChampionshipAgeCategoryPriceRepository prices, ChampionshipRegistrationPriceCalculator calculator, RegistrationCheckoutRepository checkouts, StripeCheckoutGateway stripe, RegistrationRepository registrations, RegisterForChampionshipUseCase registerForChampionship) { this.users = users; this.championships = championships; this.categories = categories; this.quotas = quotas; this.prices = prices; this.calculator = calculator; this.checkouts = checkouts; this.stripe = stripe; this.registrations = registrations; this.registerForChampionship = registerForChampionship; }
 
     public Quote quote(String userId, String championshipId, List<String> categoryIds) {
         User user = users.findById(UserId.of(userId)).orElseThrow(() -> new RegisterForChampionshipUseCase.UserNotFoundException(userId));
@@ -47,6 +48,7 @@ public class CreateStripeChampionshipBasketCheckoutUseCase {
             return category;
         }).toList();
         List<Category> existing = registrations.findByUserAndChampionship(UserId.of(userId), ChampionshipId.of(championshipId)).stream()
+                .filter(registration -> !registration.isCancelled())
                 .map(Registration::getCategoryId)
                 .map(CategoryId::of)
                 .map(categories::findById)
@@ -63,13 +65,97 @@ public class CreateStripeChampionshipBasketCheckoutUseCase {
         }
         return new Quote(calculator.calculate(selected, prices.findByChampionshipId(ChampionshipId.of(championshipId))), selected);
     }
+    @Transactional
     public StripeCheckoutSession create(String userId, String championshipId, List<String> categoryIds) {
+        releaseExpiredReservationCheckouts(userId, championshipId);
+
+        Optional<RegistrationCheckout> active = checkouts.findByActiveBasketKey(basketKey(userId, championshipId, categoryIds));
+        if (active.isPresent() && !active.get().isExpired()) {
+            return createStripeSession(active.get());
+        }
+
         Quote quote = quote(userId, championshipId, categoryIds);
         RegistrationCheckout checkout = reserveCheckout(userId, championshipId, categoryIds, quote);
-        StripeCheckoutSession session = stripe.createFor(checkout, "Inscripción campeonato");
-        checkout.bindStripeSession(session.id());
+        List<String> reservationIds;
+        try {
+            reservationIds = reserveRegistrations(userId, championshipId, categoryIds);
+        } catch (RuntimeException exception) {
+            checkout.cancel();
+            checkouts.save(checkout);
+            throw exception;
+        }
+        checkout.putMetadata("registrationIds", String.join(",", reservationIds));
         checkouts.save(checkout);
-        return session;
+        return createStripeSession(checkout);
+    }
+
+    private StripeCheckoutSession createStripeSession(RegistrationCheckout checkout) {
+        try {
+            StripeCheckoutSession session = stripe.createFor(checkout, "Inscripción campeonato");
+            checkout.bindStripeSession(session.id());
+            checkouts.save(checkout);
+            return session;
+        } catch (RuntimeException exception) {
+            String reservationIds = checkout.getMetadata().get("registrationIds");
+            if (reservationIds != null && !reservationIds.isBlank()) {
+                releaseRegistrations(List.of(reservationIds.split(",")));
+            }
+            checkout.cancel();
+            checkouts.save(checkout);
+            throw exception;
+        }
+    }
+
+    private void releaseExpiredReservationCheckouts(String userId, String championshipId) {
+        checkouts.findByUserId(userId).stream()
+                .filter(checkout -> checkout.isPendingPayment())
+                .filter(checkout -> championshipId.equals(checkout.getChampionshipId()))
+                .filter(RegistrationCheckout::isExpired)
+                .forEach(checkout -> {
+                    String reservationIds = checkout.getMetadata().get("registrationIds");
+                    if (reservationIds != null && !reservationIds.isBlank()) {
+                        releaseRegistrations(List.of(reservationIds.split(",")));
+                    }
+                    checkout.expire();
+                    checkouts.save(checkout);
+                });
+    }
+
+    /**
+     * Materializes the validated basket as PENDING registrations before going
+     * to Stripe. The webhook will only transition these rows to PAID, so a
+     * later deadline or eligibility change cannot orphan a successful payment.
+     */
+    private List<String> reserveRegistrations(String userId, String championshipId, List<String> categoryIds) {
+        List<Registration> existing = registrations.findByUserAndChampionship(
+                UserId.of(userId), ChampionshipId.of(championshipId));
+        List<String> ids = new ArrayList<>();
+        try {
+            for (String categoryId : categoryIds) {
+                Registration reservation = existing.stream()
+                        .filter(reg -> !reg.isCancelled() && reg.getCategoryId().equals(categoryId))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            String id = registerForChampionship.execute(
+                                    new RegisterForChampionshipCommand(userId, championshipId, categoryId, userId));
+                            return registrations.findById(id).orElseThrow(() -> new Registration.NotFoundException(id));
+                        });
+                ids.add(reservation.getId());
+            }
+            return ids;
+        } catch (RuntimeException exception) {
+            releaseRegistrations(ids);
+            throw exception;
+        }
+    }
+
+    private void releaseRegistrations(List<String> registrationIds) {
+        registrationIds.forEach(id -> registrations.findById(id).ifPresent(registration -> {
+            if (!registration.isCancelled() && !registration.isPaid()) {
+                registration.cancel();
+                registrations.save(registration);
+            }
+        }));
     }
 
     /**

@@ -3,6 +3,7 @@ package es.aelb.backendweb.application.news;
 import es.aelb.backendweb.domain.news.News;
 import es.aelb.backendweb.domain.news.NewsRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
+import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
 import java.text.Normalizer;
 
@@ -19,6 +20,7 @@ public class CreateNewsUseCase {
         News news = News.create(cmd.title(), slug, cmd.content(), UserId.of(cmd.authorUserId()));
 
         if (cmd.imageKey() != null && !cmd.imageKey().isBlank()) {
+            if (!StoredFileKeys.isAllowedImageKey(cmd.imageKey(), "news")) throw new IllegalArgumentException("La imagen de la noticia no es válida");
             news.setImageKey(cmd.imageKey());
         }
 

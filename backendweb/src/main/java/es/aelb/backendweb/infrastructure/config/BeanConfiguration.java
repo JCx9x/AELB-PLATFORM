@@ -114,13 +114,13 @@ public class BeanConfiguration {
     }
 
     @Bean
-    public CreateStripeChampionshipBasketCheckoutUseCase createStripeChampionshipBasketCheckoutUseCase(UserRepository users, ChampionshipRepository championships, CategoryRepository categories, QuotaRepository quotas, ChampionshipAgeCategoryPriceRepository prices, ChampionshipRegistrationPriceCalculator calculator, RegistrationCheckoutRepository checkouts, StripeCheckoutGateway stripe, RegistrationRepository registrations) {
-        return new CreateStripeChampionshipBasketCheckoutUseCase(users, championships, categories, quotas, prices, calculator, checkouts, stripe, registrations);
+    public CreateStripeChampionshipBasketCheckoutUseCase createStripeChampionshipBasketCheckoutUseCase(UserRepository users, ChampionshipRepository championships, CategoryRepository categories, QuotaRepository quotas, ChampionshipAgeCategoryPriceRepository prices, ChampionshipRegistrationPriceCalculator calculator, RegistrationCheckoutRepository checkouts, StripeCheckoutGateway stripe, RegistrationRepository registrations, RegisterForChampionshipUseCase registerForChampionship) {
+        return new CreateStripeChampionshipBasketCheckoutUseCase(users, championships, categories, quotas, prices, calculator, checkouts, stripe, registrations, registerForChampionship);
     }
 
     @Bean
-    public ConfirmStripeChampionshipBasketPaymentUseCase confirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegisterForChampionshipUseCase registrations, RegistrationRepository repository) {
-        return new ConfirmStripeChampionshipBasketPaymentUseCase(checkouts, registrations, repository);
+    public ConfirmStripeChampionshipBasketPaymentUseCase confirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository repository) {
+        return new ConfirmStripeChampionshipBasketPaymentUseCase(checkouts, repository);
     }
 
     @Bean

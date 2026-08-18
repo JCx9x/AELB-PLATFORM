@@ -6,7 +6,7 @@ import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
-import java.util.Base64;
+import es.aelb.backendweb.infrastructure.storage.FileUploadValidator;
 
 public class CreateResultUseCase {
 
@@ -19,7 +19,7 @@ public class CreateResultUseCase {
     }
 
     public Result execute(CreateResultCommand cmd) {
-        byte[] rawBytes       = Base64.getDecoder().decode(cmd.pdfBase64());
+        byte[] rawBytes       = FileUploadValidator.decodePdf(cmd.pdfBase64(), cmd.pdfFileName());
         long   originalSize   = rawBytes.length;
         Result result = Result.create(
                 cmd.title(), cmd.description(),

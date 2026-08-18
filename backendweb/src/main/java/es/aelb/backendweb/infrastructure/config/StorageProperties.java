@@ -14,6 +14,7 @@ public class StorageProperties {
     private String publicEndpoint   = "http://localhost:9000";
     private int    presignUploadMinutes = 15;
     private int    presignReadMinutes   = 1440;
+    private long   maxUploadBytes       = 5 * 1024 * 1024;
 
     public String getBucket()               { return bucket; }
     public void   setBucket(String v)       { this.bucket = v; }
@@ -41,4 +42,7 @@ public class StorageProperties {
 
     public int  getPresignReadMinutes()              { return presignReadMinutes; }
     public void setPresignReadMinutes(int v)         { this.presignReadMinutes = v; }
+
+    public long getMaxUploadBytes()                  { return maxUploadBytes; }
+    public void setMaxUploadBytes(long v)             { this.maxUploadBytes = v; }
 }

@@ -11,6 +11,9 @@ public interface SpringQuotaJpaRepository extends JpaRepository<QuotaJpaEntity, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select q from QuotaJpaEntity q where q.userId = :userId and q.year = :year")
     Optional<QuotaJpaEntity> findByUserIdAndYearForUpdate(String userId, int year);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select q from QuotaJpaEntity q where q.stripeSessionId = :stripeSessionId")
+    Optional<QuotaJpaEntity> findByStripeSessionIdForUpdate(String stripeSessionId);
     boolean existsByUserIdAndYear(String userId, int year);
     List<QuotaJpaEntity> findByUserIdOrderByYearDesc(String userId);
     @Query("select q.userId from QuotaJpaEntity q where q.year = :year and q.paymentStatus = 'PAID'")

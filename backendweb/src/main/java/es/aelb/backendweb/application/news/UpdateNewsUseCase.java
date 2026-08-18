@@ -3,6 +3,7 @@ package es.aelb.backendweb.application.news;
 import es.aelb.backendweb.domain.news.News;
 import es.aelb.backendweb.domain.news.NewsRepository;
 import es.aelb.backendweb.domain.news.valueobject.NewsId;
+import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
 public class UpdateNewsUseCase {
 
@@ -21,6 +22,7 @@ public class UpdateNewsUseCase {
         if (cmd.removeImage()) {
             news.removeImage();
         } else if (cmd.imageKey() != null && !cmd.imageKey().isBlank()) {
+            if (!StoredFileKeys.isAllowedImageKey(cmd.imageKey(), "news")) throw new IllegalArgumentException("La imagen de la noticia no es válida");
             news.setImageKey(cmd.imageKey());
         }
 

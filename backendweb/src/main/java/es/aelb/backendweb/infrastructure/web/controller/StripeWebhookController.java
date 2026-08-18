@@ -40,8 +40,10 @@ public class StripeWebhookController {
             }
             String userId = metadata.path("user_id").asText();
             int year = metadata.path("year").asInt(0);
-            if (userId.isBlank() || year == 0) return ResponseEntity.badRequest().build();
-            confirmPayment.execute(userId, year, session.path("id").asText());
+            String sessionId = session.path("id").asText();
+            long amountTotalInCents = session.path("amount_total").asLong(-1);
+            if (userId.isBlank() || year == 0 || sessionId.isBlank() || amountTotalInCents < 0) return ResponseEntity.badRequest().build();
+            confirmPayment.execute(userId, year, sessionId, amountTotalInCents);
             return ResponseEntity.ok().build();
         } catch (Exception ex) { return ResponseEntity.badRequest().build(); }
     }

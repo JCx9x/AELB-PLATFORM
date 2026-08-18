@@ -29,7 +29,7 @@ public final class RegistrationCheckout {
     private final List<CheckoutLineItem>  lineItems;
     private final BigDecimal              total;
     private final String                  currency;
-    private final Map<String, String>     metadata;
+    private       Map<String, String>     metadata;
     /** Present only while this basket reserves a payment attempt; null once released. */
     private       String                  basketKey;
     private       CheckoutStatus          status;
@@ -103,6 +103,14 @@ public final class RegistrationCheckout {
             throw new StripeSessionMismatchException(id);
         }
         this.stripeSessionId = sessionId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** Persists the registration reservation IDs created for this checkout. */
+    public void putMetadata(String key, String value) {
+        Map<String, String> updated = new java.util.HashMap<>(metadata);
+        updated.put(key, value);
+        this.metadata = Map.copyOf(updated);
         this.updatedAt = LocalDateTime.now();
     }
 

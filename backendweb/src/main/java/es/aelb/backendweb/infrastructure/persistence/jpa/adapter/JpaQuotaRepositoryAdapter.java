@@ -13,6 +13,7 @@ public class JpaQuotaRepositoryAdapter implements QuotaRepository {
     public void save(Quota q) { repository.save(toJpa(q)); }
     public Optional<Quota> findByUserAndYear(UserId id, int year) { return repository.findByUserIdAndYear(id.value(), year).map(this::toDomain); }
     public Optional<Quota> findByUserAndYearForUpdate(UserId id, int year) { return repository.findByUserIdAndYearForUpdate(id.value(), year).map(this::toDomain); }
+    public Optional<Quota> findByStripeSessionIdForUpdate(String stripeSessionId) { return repository.findByStripeSessionIdForUpdate(stripeSessionId).map(this::toDomain); }
     public boolean existsByUserAndYear(UserId id, int year) { return repository.existsByUserIdAndYear(id.value(), year); }
     public List<Quota> findByUser(UserId id) { return repository.findByUserIdOrderByYearDesc(id.value()).stream().map(this::toDomain).toList(); }
     public List<String> findPaidUserIdsByYear(int year) { return repository.findPaidUserIdsByYear(year); }

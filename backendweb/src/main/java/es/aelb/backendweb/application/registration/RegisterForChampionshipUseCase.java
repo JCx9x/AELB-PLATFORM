@@ -107,7 +107,9 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
 
         Shift requestedShift = requestedCategory.getShift();
 
-        List<Registration> existing = registrationRepository.findByUserAndChampionship(userId, championshipId);
+        List<Registration> existing = registrationRepository.findByUserAndChampionship(userId, championshipId).stream()
+                .filter(registration -> !registration.isCancelled())
+                .toList();
 
         if (existing.size() >= 4) {
             throw new MaxRegistrationsExceededException(cmd.userId());

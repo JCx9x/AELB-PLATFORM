@@ -20,15 +20,22 @@ public class PresignedUrlService {
     }
 
     public String generateUploadUrl(String key, String contentType) {
+        return generateUploadUrl(key, contentType, null);
+    }
+
+    public String generateUploadUrl(String key, String contentType, Long contentLength) {
         PutObjectPresignRequest req = PutObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(props.getPresignUploadMinutes()))
                 .putObjectRequest(r -> r
                         .bucket(props.getBucket())
                         .key(key)
-                        .contentType(contentType))
+                        .contentType(contentType)
+                        .contentLength(contentLength))
                 .build();
         return presigner.presignPutObject(req).url().toString();
     }
+
+    public long maxUploadBytes() { return props.getMaxUploadBytes(); }
 
     public String generateReadUrl(String key) {
         GetObjectPresignRequest req = GetObjectPresignRequest.builder()

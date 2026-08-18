@@ -6,7 +6,7 @@ import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
-import java.util.Base64;
+import es.aelb.backendweb.infrastructure.storage.FileUploadValidator;
 
 public class CreateDocumentUseCase {
 
@@ -19,7 +19,7 @@ public class CreateDocumentUseCase {
     }
 
     public Document execute(CreateDocumentCommand cmd) {
-        byte[] rawBytes      = Base64.getDecoder().decode(cmd.fileBase64());
+        byte[] rawBytes      = FileUploadValidator.decodeDocument(cmd.fileBase64(), cmd.fileName());
         long   originalSize  = rawBytes.length;
         Document document = Document.create(
                 cmd.title(), cmd.description(),

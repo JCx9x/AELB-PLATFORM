@@ -3,6 +3,7 @@ package es.aelb.backendweb.application.championship;
 import es.aelb.backendweb.domain.championship.Championship;
 import es.aelb.backendweb.domain.championship.ChampionshipRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
+import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
 public class CreateChampionshipUseCase {
 
@@ -13,6 +14,10 @@ public class CreateChampionshipUseCase {
     }
 
     public Championship execute(CreateChampionshipCommand cmd) {
+        if (cmd.imageKey() != null && !cmd.imageKey().isBlank()
+                && !StoredFileKeys.isAllowedImageKey(cmd.imageKey(), "championships")) {
+            throw new IllegalArgumentException("La imagen del campeonato no es válida");
+        }
         Championship c = Championship.create(
                 cmd.name(), cmd.location(),
                 cmd.eventDate(), cmd.registrationDeadline(),

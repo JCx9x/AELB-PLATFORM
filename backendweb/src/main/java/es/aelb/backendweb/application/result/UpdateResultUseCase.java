@@ -6,7 +6,7 @@ import es.aelb.backendweb.domain.result.valueobject.ResultId;
 import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import es.aelb.backendweb.infrastructure.storage.StoredFileKeys;
 
-import java.util.Base64;
+import es.aelb.backendweb.infrastructure.storage.FileUploadValidator;
 
 public class UpdateResultUseCase {
 
@@ -25,7 +25,7 @@ public class UpdateResultUseCase {
         result.update(cmd.title(), cmd.description());
 
         if (cmd.pdfBase64() != null && !cmd.pdfBase64().isBlank()) {
-            byte[] rawBytes      = Base64.getDecoder().decode(cmd.pdfBase64());
+            byte[] rawBytes      = FileUploadValidator.decodePdf(cmd.pdfBase64(), cmd.pdfFileName());
             long   originalSize  = rawBytes.length;
             String storageKey = StoredFileKeys.result(result.getId().value(), cmd.pdfFileName());
             fileStorage.put(storageKey, rawBytes, "application/pdf");

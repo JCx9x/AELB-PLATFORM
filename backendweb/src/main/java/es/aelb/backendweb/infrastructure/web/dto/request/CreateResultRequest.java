@@ -13,9 +13,11 @@ public record CreateResultRequest(
         String description,
 
         @NotBlank(message = "El PDF no puede estar vacío")
+        @Size(max = 28000000, message = "El PDF supera el tamaño máximo permitido")
         String pdfBase64,
 
         @NotBlank(message = "El nombre del archivo no puede estar vacío")
+        @Size(max = 255, message = "El nombre del archivo no puede superar los 255 caracteres")
         String pdfFileName,
 
         @NotNull
