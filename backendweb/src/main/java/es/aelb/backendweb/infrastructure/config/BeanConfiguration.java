@@ -44,6 +44,7 @@ import es.aelb.backendweb.application.user.ChangePasswordUseCase;
 import es.aelb.backendweb.application.user.CreateUserUseCase;
 import es.aelb.backendweb.application.user.DeleteUserUseCase;
 import es.aelb.backendweb.application.user.LoginUseCase;
+import es.aelb.backendweb.application.user.ManagementUpdateProfileUseCase;
 import es.aelb.backendweb.application.user.UpdateProfileUseCase;
 import es.aelb.backendweb.application.user.RequestPasswordResetUseCase;
 import es.aelb.backendweb.application.user.ResetPasswordUseCase;
@@ -192,6 +193,11 @@ public class BeanConfiguration {
     @Bean
     public UpdateProfileUseCase updateProfileUseCase(UserRepository userRepository) {
         return new UpdateProfileUseCase(userRepository);
+    }
+
+    @Bean
+    public ManagementUpdateProfileUseCase managementUpdateProfileUseCase(UserRepository userRepository) {
+        return new ManagementUpdateProfileUseCase(userRepository);
     }
 
     @Bean

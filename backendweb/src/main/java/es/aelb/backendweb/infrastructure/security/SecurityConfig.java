@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
 import java.util.List;
+import org.slf4j.MDC;
 
 /**
  * Configuración de Spring Security — Modelo de acceso:
@@ -75,6 +76,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Health probes are used by the load balancer; metrics remain private.
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/metrics/**").hasAnyRole("ADMIN", "GESTOR")
+                        .requestMatchers("/actuator/**").denyAll()
 
                         // ── Auth y registro ──────────────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
@@ -202,19 +207,22 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, e) -> {
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             res.setContentType("application/problem+json");
-                            res.getWriter().write(
-                                    "{\"status\":401,\"title\":\"Unauthorized\",\"detail\":\"Token ausente o inválido\"}"
-                            );
+                            res.setHeader("X-Correlation-ID", MDC.get("correlationId"));
+                            res.getWriter().write("{\"status\":401,\"title\":\"Unauthorized\",\"detail\":\"Token ausente o inválido\",\"correlationId\":\"" + safeCorrelationId() + "\"}");
                         })
                         .accessDeniedHandler((req, res, e) -> {
                             res.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             res.setContentType("application/problem+json");
-                            res.getWriter().write(
-                                    "{\"status\":403,\"title\":\"Forbidden\",\"detail\":\"No tienes permiso para realizar esta acción\"}"
-                            );
+                            res.setHeader("X-Correlation-ID", MDC.get("correlationId"));
+                            res.getWriter().write("{\"status\":403,\"title\":\"Forbidden\",\"detail\":\"No tienes permiso para realizar esta acción\",\"correlationId\":\"" + safeCorrelationId() + "\"}");
                         })
                 )
                 .build();
+    }
+
+    private static String safeCorrelationId() {
+        String value = MDC.get("correlationId");
+        return value == null ? "unknown" : value.replaceAll("[^A-Za-z0-9._-]", "");
     }
 
     @Bean

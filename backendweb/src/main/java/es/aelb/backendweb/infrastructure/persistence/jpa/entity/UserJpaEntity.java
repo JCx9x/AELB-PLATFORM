@@ -50,7 +50,7 @@ public class UserJpaEntity {
     @Column(name = "nationality", length = 100)
     private String nationality;
 
-    @Column(name = "birth_date")
+    @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
 
     @Enumerated(EnumType.STRING)

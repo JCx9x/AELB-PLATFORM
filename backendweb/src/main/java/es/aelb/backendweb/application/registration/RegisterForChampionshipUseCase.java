@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
 import java.math.BigDecimal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Inscribe un usuario en una categoría de un campeonato.
@@ -41,6 +43,7 @@ import java.math.BigDecimal;
  * Ejemplo válido: master -75 kg LEFT (mañana) + master -75 kg RIGHT (mañana).
  */
 public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampionshipCommand, String> {
+    private static final Logger log = LoggerFactory.getLogger(RegisterForChampionshipUseCase.class);
 
     private final UserRepository         userRepository;
     private final ChampionshipRepository championshipRepository;
@@ -154,6 +157,7 @@ public class RegisterForChampionshipUseCase implements UseCase<RegisterForChampi
         Registration registration = Registration.create(userId, championshipId, cmd.categoryId(), newTotal.subtract(previousTotal), registeredById);
         registrationRepository.save(registration);
         emailService.requestRegistrationConfirmation(user.getEmail().value(), user.getFullName(), registration.getId(), championship.getName());
+        log.info("event=REGISTRATION_CREATED registrationId={} userId={} championshipId={}", registration.getId(), cmd.userId(), cmd.championshipId());
         return registration.getId();
     }
 

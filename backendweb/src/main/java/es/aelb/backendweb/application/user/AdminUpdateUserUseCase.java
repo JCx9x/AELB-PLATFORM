@@ -19,11 +19,9 @@ public class AdminUpdateUserUseCase {
         User user = userRepository.findById(UserId.of(cmd.userId()))
                 .orElseThrow(() -> new User.NotFoundException(cmd.userId()));
 
-        // Update profile fields
-        LocalDate birthDate = (cmd.birthDate() != null && !cmd.birthDate().isBlank())
-                ? LocalDate.parse(cmd.birthDate())
-                : null;
-        user.updateProfile(cmd.firstName(), cmd.lastName(), cmd.phone(), birthDate);
+        // La fecha de nacimiento es obligatoria; solo GESTOR/ADMIN pueden cambiarla.
+        LocalDate birthDate = LocalDate.parse(cmd.birthDate());
+        user.updateManagedProfile(cmd.firstName(), cmd.lastName(), cmd.phone(), birthDate);
 
         // Update role if provided
         if (cmd.role() != null && !cmd.role().isBlank()) {

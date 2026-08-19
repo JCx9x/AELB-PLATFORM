@@ -43,7 +43,7 @@ CREATE TABLE users (
     city          VARCHAR(100),
     province      VARCHAR(100),
     nationality   VARCHAR(100),
-    birth_date    DATE,
+    birth_date    DATE         NOT NULL,
     role          ENUM('USER','GESTOR','ADMIN') NOT NULL DEFAULT 'USER',
     is_blocked    TINYINT(1)   NOT NULL DEFAULT 0,
     email_verified TINYINT(1)  NOT NULL DEFAULT 0,

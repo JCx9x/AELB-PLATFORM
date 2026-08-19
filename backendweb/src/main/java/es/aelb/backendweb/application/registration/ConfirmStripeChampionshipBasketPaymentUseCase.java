@@ -10,9 +10,12 @@ import org.springframework.transaction.annotation.Transactional;
 import es.aelb.backendweb.application.email.EmailService;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.championship.ChampionshipRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Confirma las reservas ya creadas cuando llega el webhook firmado de Stripe. */
 public class ConfirmStripeChampionshipBasketPaymentUseCase {
+    private static final Logger log = LoggerFactory.getLogger(ConfirmStripeChampionshipBasketPaymentUseCase.class);
     private final RegistrationCheckoutRepository checkouts; private final RegistrationRepository registrationRepository; private final UserRepository users; private final ChampionshipRepository championships; private final EmailService emails;
     public ConfirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository registrationRepository) { this(checkouts,registrationRepository,null,null,EmailService.NOOP); }
     public ConfirmStripeChampionshipBasketPaymentUseCase(RegistrationCheckoutRepository checkouts, RegistrationRepository registrationRepository, UserRepository users, ChampionshipRepository championships, EmailService emails) { this.checkouts = checkouts; this.registrationRepository = registrationRepository; this.users=users;this.championships=championships;this.emails=emails; }
@@ -20,7 +23,7 @@ public class ConfirmStripeChampionshipBasketPaymentUseCase {
     public void execute(String checkoutId, String stripeSessionId) {
         RegistrationCheckout checkout = checkouts.findByIdForUpdate(checkoutId).orElseThrow(() -> new RegistrationCheckout.NotFoundException(checkoutId));
         checkout.validateStripeSession(stripeSessionId);
-        if (checkout.isPaid()) return;
+        if (checkout.isPaid()) { log.info("event=PAYMENT_ALREADY_CONFIRMED checkoutId={} stripeSessionId={}", checkoutId, stripeSessionId); return; }
         String reservationIds = checkout.getMetadata().get("registrationIds");
         if (reservationIds == null || reservationIds.isBlank()) throw new IllegalArgumentException("El checkout no contiene reservas de inscripción.");
         for (String reservationId : reservationIds.split(",")) {
@@ -34,6 +37,7 @@ public class ConfirmStripeChampionshipBasketPaymentUseCase {
         }
         checkout.confirmPayment(stripeSessionId);
         checkouts.save(checkout);
+        log.info("event=PAYMENT_CONFIRMED paymentId={} stripeSessionId={}", checkoutId, stripeSessionId);
         if (users != null) users.findById(UserId.of(checkout.getUserId())).ifPresent(user -> championships.findById(ChampionshipId.of(checkout.getChampionshipId())).ifPresent(champ -> emails.requestPaymentConfirmation(user.getEmail().value(), user.getFullName(), checkout.getId(), "Inscripciones en " + champ.getName(), checkout.getTotal().toPlainString() + " EUR")));
     }
 }

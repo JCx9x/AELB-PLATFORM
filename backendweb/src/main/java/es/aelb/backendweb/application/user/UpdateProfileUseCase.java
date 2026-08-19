@@ -17,7 +17,7 @@ public class UpdateProfileUseCase {
         User user = userRepository.findById(UserId.of(cmd.userId()))
                 .orElseThrow(() -> new UserNotFoundException(cmd.userId()));
 
-        user.updateProfile(cmd.firstName(), cmd.lastName(), cmd.phone(), cmd.birthDate());
+        user.updateProfile(cmd.firstName(), cmd.lastName(), cmd.phone());
         userRepository.save(user);
         return user;
     }

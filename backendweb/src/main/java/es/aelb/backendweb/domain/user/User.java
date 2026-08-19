@@ -82,6 +82,7 @@ public class User extends AggregateRoot<UserId> {
     ) {
         validateName(firstName, "nombre");
         validateName(lastName, "apellido");
+        validateBirthDate(birthDate);
         return new User(
                 UserId.generate(), email, passwordHash,
                 firstName, lastName, dni, phone, city, province, nationality, birthDate,
@@ -126,9 +127,27 @@ public class User extends AggregateRoot<UserId> {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void updateProfile(String firstName, String lastName, String phone, LocalDate birthDate) {
+    /**
+     * Autoedición de perfil. La fecha de nacimiento no es editable por el
+     * propio usuario: solo un GESTOR/ADMIN puede cambiarla, vía {@link #updateManagedProfile}.
+     */
+    public void updateProfile(String firstName, String lastName, String phone) {
         validateName(firstName, "nombre");
         validateName(lastName, "apellido");
+        this.firstName = firstName;
+        this.lastName  = lastName;
+        this.phone     = phone;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * Edición de perfil por GESTOR/ADMIN. Es la única vía para cambiar la
+     * fecha de nacimiento tras el registro; sigue siendo obligatoria.
+     */
+    public void updateManagedProfile(String firstName, String lastName, String phone, LocalDate birthDate) {
+        validateName(firstName, "nombre");
+        validateName(lastName, "apellido");
+        validateBirthDate(birthDate);
         this.firstName = firstName;
         this.lastName  = lastName;
         this.phone     = phone;
@@ -175,6 +194,15 @@ public class User extends AggregateRoot<UserId> {
     private static void validateName(String name, String field) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("El " + field + " no puede estar vacío");
+        }
+    }
+
+    private static void validateBirthDate(LocalDate birthDate) {
+        if (birthDate == null) {
+            throw new IllegalArgumentException("La fecha de nacimiento es obligatoria");
+        }
+        if (birthDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha de nacimiento no puede ser futura");
         }
     }
 

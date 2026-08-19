@@ -7,6 +7,8 @@ import es.aelb.backendweb.application.user.ChangePasswordUseCase;
 import es.aelb.backendweb.application.user.CreateUserCommand;
 import es.aelb.backendweb.application.user.CreateUserUseCase;
 import es.aelb.backendweb.application.user.DeleteUserUseCase;
+import es.aelb.backendweb.application.user.ManagementUpdateProfileCommand;
+import es.aelb.backendweb.application.user.ManagementUpdateProfileUseCase;
 import es.aelb.backendweb.application.user.UpdateProfileCommand;
 import es.aelb.backendweb.application.user.UpdateProfileUseCase;
 import es.aelb.backendweb.domain.user.User;
@@ -16,6 +18,7 @@ import es.aelb.backendweb.domain.quota.QuotaRepository;
 import es.aelb.backendweb.infrastructure.web.dto.request.AdminUpdateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.ChangePasswordRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateUserRequest;
+import es.aelb.backendweb.infrastructure.web.dto.request.ManagementUpdateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateProfileRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.UserResponse;
 import jakarta.validation.Valid;
@@ -37,6 +40,7 @@ public class UserController {
 
     private final CreateUserUseCase     createUserUseCase;
     private final UpdateProfileUseCase  updateProfileUseCase;
+    private final ManagementUpdateProfileUseCase managementUpdateProfileUseCase;
     private final AdminUpdateUserUseCase adminUpdateUserUseCase;
     private final ChangePasswordUseCase changePasswordUseCase;
     private final DeleteUserUseCase     deleteUserUseCase;
@@ -46,6 +50,7 @@ public class UserController {
     public UserController(
             CreateUserUseCase createUserUseCase,
             UpdateProfileUseCase updateProfileUseCase,
+            ManagementUpdateProfileUseCase managementUpdateProfileUseCase,
             AdminUpdateUserUseCase adminUpdateUserUseCase,
             ChangePasswordUseCase changePasswordUseCase,
             DeleteUserUseCase deleteUserUseCase,
@@ -54,6 +59,7 @@ public class UserController {
     ) {
         this.createUserUseCase     = createUserUseCase;
         this.updateProfileUseCase  = updateProfileUseCase;
+        this.managementUpdateProfileUseCase = managementUpdateProfileUseCase;
         this.adminUpdateUserUseCase = adminUpdateUserUseCase;
         this.changePasswordUseCase = changePasswordUseCase;
         this.deleteUserUseCase     = deleteUserUseCase;
@@ -156,7 +162,7 @@ public class UserController {
         }
 
         User updated = updateProfileUseCase.execute(
-                new UpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone(), req.birthDate())
+                new UpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone())
         );
         return ResponseEntity.ok(UserResponse.from(updated));
     }
@@ -188,10 +194,10 @@ public class UserController {
     @PutMapping("/{id}/management")
     public ResponseEntity<UserResponse> managementUpdate(
             @PathVariable String id,
-            @Valid @RequestBody UpdateProfileRequest req
+            @Valid @RequestBody ManagementUpdateUserRequest req
     ) {
-        User updated = updateProfileUseCase.execute(
-                new UpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone(), req.birthDate())
+        User updated = managementUpdateProfileUseCase.execute(
+                new ManagementUpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone(), req.birthDate())
         );
         return ResponseEntity.ok(UserResponse.from(updated));
     }

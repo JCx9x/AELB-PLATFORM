@@ -34,5 +34,7 @@ public record CreateUserRequest(
         @NotBlank @Size(max = 100)
         String nationality,
 
+        @NotNull(message = "La fecha de nacimiento es obligatoria")
+        @Past(message = "La fecha de nacimiento no puede ser futura")
         LocalDate birthDate
 ) {}

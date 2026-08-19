@@ -1,11 +1,9 @@
 package es.aelb.backendweb.application.user;
 
-import java.time.LocalDate;
-
+/** Autoedición de perfil. No incluye birthDate: el usuario no puede modificar su fecha de nacimiento. */
 public record UpdateProfileCommand(
-        String    userId,
-        String    firstName,
-        String    lastName,
-        String    phone,
-        LocalDate birthDate
+        String userId,
+        String firstName,
+        String lastName,
+        String phone
 ) {}

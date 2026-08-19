@@ -5,7 +5,7 @@ public record AdminUpdateUserCommand(
         String  firstName,
         String  lastName,
         String  phone,
-        String  birthDate,   // ISO date string, nullable
+        String  birthDate,   // ISO date string, obligatorio
         String  role,        // nullable = don't change
         Boolean blocked      // nullable = don't change
 ) {}

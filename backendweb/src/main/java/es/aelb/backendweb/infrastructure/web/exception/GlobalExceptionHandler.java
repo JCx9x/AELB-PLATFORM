@@ -19,6 +19,9 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.util.stream.Collectors;
 
@@ -28,6 +31,14 @@ import java.util.stream.Collectors;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private ProblemDetail problem(HttpStatus status, String code, String detail) {
+        ProblemDetail result = ProblemDetail.forStatusAndDetail(status, detail);
+        result.setProperty("code", code);
+        result.setProperty("correlationId", MDC.get("correlationId"));
+        return result;
+    }
 
     @ExceptionHandler(LoginUseCase.InvalidCredentialsException.class)
     public ProblemDetail handleInvalidCredentials(LoginUseCase.InvalidCredentialsException ex) {
@@ -119,7 +130,8 @@ public class GlobalExceptionHandler {
         String detail = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + ": " + e.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        log.info("event=VALIDATION_ERROR fields={}", ex.getBindingResult().getFieldErrorCount());
+        return problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", detail);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -134,6 +146,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneric(Exception ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor");
+        log.error("event=INTERNAL_ERROR exceptionType={}", ex.getClass().getName(), ex);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Ha ocurrido un error inesperado.");
     }
 }
