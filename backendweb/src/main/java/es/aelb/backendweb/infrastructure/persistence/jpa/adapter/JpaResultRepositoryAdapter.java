@@ -5,6 +5,8 @@ import es.aelb.backendweb.domain.result.ResultRepository;
 import es.aelb.backendweb.domain.result.valueobject.ResultId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.ResultJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringResultJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -46,6 +48,11 @@ public class JpaResultRepositoryAdapter implements ResultRepository {
         return jpaRepository.findByPublishedTrueOrderByPublishedAtDesc().stream()
                 .map(ResultJpaMapper::toDomain)
                 .toList();
+    }
+
+    @Override public PageResult<Result> findPage(int page, int size, boolean publishedOnly) {
+        var result = publishedOnly ? jpaRepository.findByPublishedTrueOrderByPublishedAtDesc(PageRequest.of(page, size)) : jpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(ResultJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

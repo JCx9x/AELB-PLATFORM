@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auditoría técnica de PRE gratuita — AELB</title>
+  <style>
+    :root { --ink:#172033; --muted:#5d687a; --blue:#145da0; --line:#dbe3ec; --bg:#f5f7fa; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); }
+    main { max-width:1100px; margin:32px auto; padding:0 28px 60px; background:#fff; }
+    header { padding:48px 0 28px; border-bottom:3px solid var(--blue); }
+    h1 { margin:0 0 8px; font-size:34px; line-height:1.15; }
+    h2 { margin:42px 0 14px; padding-bottom:6px; border-bottom:1px solid var(--line); color:var(--blue); }
+    h3 { margin-top:25px; }
+    .meta,.muted { color:var(--muted); }
+    .answer { margin:24px 0; padding:18px 22px; border-left:5px solid #16803c; background:#eef9f1; font-size:18px; }
+    .warning { padding:14px 18px; border-left:5px solid #c88600; background:#fff8e7; }
+    table { width:100%; border-collapse:collapse; margin:14px 0 20px; font-size:13px; }
+    th,td { border:1px solid var(--line); padding:8px 9px; vertical-align:top; text-align:left; }
+    th { background:#edf3f8; }
+    code,pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    pre { padding:14px; overflow:auto; background:#172033; color:#edf3f8; border-radius:5px; }
+    a { color:var(--blue); }
+    ul,ol { padding-left:24px; }
+    .page-break { break-before:page; }
+    @media print { body { background:#fff; } main { margin:0; max-width:none; } a { color:inherit; text-decoration:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Auditoría técnica de PRE gratuita o de coste mínimo</h1>
+    <p class="meta">Proyecto AELB · Precios/free tiers verificados: 20 de agosto de 2026</p>
+    <div class="answer"><strong>Conclusión:</strong> sí. Desplegaría PRE en una VM Always Free de Oracle Cloud con Docker Compose, MySQL persistente, Mailpit, Caddy y S3 AWS real.</div>
+  </header>
+
+  <h2>1. RESUMEN EJECUTIVO</h2>
+  <p>La arquitectura más adecuada para probar la aplicación completa durante meses es una VM ARM Always Free de Oracle Cloud. Permite ejecutar el mismo modelo Docker que posteriormente puede trasladarse a EC2, mantiene frontend, backend, MySQL y Mailpit en la misma red, evita problemas de cookies/CSRF mediante un reverse proxy same-origin y no duerme.</p>
+  <p>Coste esperado: <strong>0 €/mes de infraestructura</strong>, o aproximadamente <strong>0–0,30 €/mes</strong> usando un bucket S3 AWS separado para PRE. El dominio y Cloudflare DNS no añaden coste si el dominio ya existe.</p>
+  <p>El backend no debe ejecutarse con 256 MB. 512 MB es posible con JVM limitada; 1 GB es el mínimo cómodo. Oracle ofrece recursos suficientes para ejecutar también MySQL y el frontend.</p>
+
+  <h2>2. REQUISITOS REALES DE LA APP</h2>
+  <table><tr><th>Componente</th><th>Tecnología</th><th>Recursos mínimos</th><th>Persistencia</th><th>Público</th></tr>
+    <tr><td>Frontend</td><td>Next.js 16.3, React 19, Node 22, standalone</td><td>256–512 MB, 0,1–0,5 CPU</td><td>No local</td><td>Sí</td></tr>
+    <tr><td>Backend</td><td>Spring Boot 4.0.6, Java 21, JPA, Security, Actuator</td><td>512 MB mínimo; 1 GB recomendado</td><td>No local</td><td>Sí</td></tr>
+    <tr><td>DB</td><td>MySQL 8.4</td><td>512 MB–1 GB RAM, 5–20 GB disco</td><td>Sí</td><td>No</td></tr>
+    <tr><td>Storage</td><td>S3 API; MinIO local</td><td>Según objetos</td><td>Sí</td><td>No directo</td></tr>
+    <tr><td>Email</td><td>SMTP/SES, transactional outbox, worker @Scheduled</td><td>Muy bajo</td><td>Outbox en MySQL</td><td>Mailpit protegido</td></tr>
+  </table>
+  <p>La inspección confirma JWT en cookies HttpOnly, refresh tokens, CSRF mediante cookie <code>XSRF-TOKEN</code>, CORS explícito, Stripe Checkout/webhooks, S3 presigned URLs, migraciones SQL manuales, Actuator liveness/readiness, EmailWorker y rate limiter.</p>
+  <p>El frontend no es estático actualmente: usa Server Components/i18n con cookies, una route handler, la ruta dinámica <code>/campeonatos/[id]</code> y <code>output: standalone</code>. No hay un perfil Spring <code>pre</code> todavía.</p>
+
+  <h2>3. RECURSOS MÍNIMOS</h2>
+  <table><tr><th>Backend</th><th>Evaluación</th></tr>
+    <tr><td>256 MB</td><td>No recomendable: riesgo elevado de OOM durante arranque o con Hibernate/AWS SDK.</td></tr>
+    <tr><td>512 MB</td><td>Viable con JVM acotada, pocos hilos y conexiones.</td></tr>
+    <tr><td>1 GB</td><td>Recomendado para PRE.</td></tr>
+    <tr><td>2 GB</td><td>Cómodo, pero innecesario para 1–5 usuarios.</td></tr>
+  </table>
+  <p>Configuración orientativa para contenedor de 512 MB:</p>
+  <pre>-XX:InitialRAMPercentage=15
+-XX:MaxRAMPercentage=55
+-XX:+UseSerialGC
+-Djava.security.egd=file:/dev/./urandom</pre>
+  <p>Para 1 GB: <code>InitialRAMPercentage=20</code>, <code>MaxRAMPercentage=65</code> y G1GC. No usaría <code>-Xmx450m</code> en un contenedor de 512 MB.</p>
+  <p>La medición Docker no pudo ejecutarse porque el daemon local no era accesible desde el entorno de auditoría; las cifras son una estimación técnica basada en las dependencias reales.</p>
+
+  <h2>4. PLATAFORMAS GRATUITAS INVESTIGADAS</h2>
+  <table><tr><th>Plataforma</th><th>Free</th><th>RAM</th><th>Sleep</th><th>Docker</th><th>Dictamen</th></tr>
+    <tr><td>Render</td><td>Sí, indefinido</td><td>512 MB</td><td>15 min; ~1 min al despertar</td><td>Sí</td><td>Válida, limitada</td></tr>
+    <tr><td>Railway</td><td>Trial; después 1 USD/mes de crédito</td><td>512 MB</td><td>Variable</td><td>Sí</td><td>No como PRE permanente completa</td></tr>
+    <tr><td>Fly.io</td><td>No para nuevas cuentas</td><td>Desde 256 MB</td><td>Configurable</td><td>Sí</td><td>Descartada</td></tr>
+    <tr><td>Koyeb</td><td>Sí, 1 servicio</td><td>512 MB, 0,1 CPU</td><td>1 hora</td><td>Sí</td><td>Demasiado limitada</td></tr>
+    <tr><td>Vercel</td><td>Hobby</td><td>Serverless</td><td>Scale-to-zero</td><td>No</td><td>Frontend posible; no stack completo</td></tr>
+    <tr><td>Netlify</td><td>0 USD, 300 créditos</td><td>Functions 1 GB</td><td>Serverless</td><td>No</td><td>Requeriría adaptación</td></tr>
+    <tr><td>Cloudflare</td><td>Sí</td><td>Workers 128 MB</td><td>Edge</td><td>No</td><td>No con Docker actual</td></tr>
+    <tr><td>Oracle Cloud</td><td>Always Free</td><td>2 OCPU/12 GB seguros</td><td>No</td><td>Sí</td><td>Recomendada</td></tr>
+    <tr><td>Google Cloud Run</td><td>Cuota Always Free</td><td>Variable</td><td>Scale-to-zero</td><td>Sí</td><td>Buena alternativa</td></tr>
+    <tr><td>Azure</td><td>Créditos/12 meses</td><td>B1S según oferta</td><td>No</td><td>Sí</td><td>No permanente equivalente</td></tr>
+    <tr><td>Supabase</td><td>Sí</td><td>PostgreSQL 500 MB</td><td>1 semana</td><td>No</td><td>No compatible con MySQL</td></tr>
+    <tr><td>Neon</td><td>Sí</td><td>PostgreSQL</td><td>5 min</td><td>No</td><td>No compatible con MySQL</td></tr>
+    <tr><td>PlanetScale</td><td>No</td><td>—</td><td>—</td><td>—</td><td>Actualmente de pago</td></tr>
+    <tr><td>Aiven</td><td>Sí</td><td>1 GB MySQL</td><td>Puede apagarse por inactividad</td><td>Servicio DB</td><td>Mejor DB gestionada gratuita</td></tr>
+    <tr><td>TiDB Cloud</td><td>Según producto</td><td>Variable</td><td>Variable</td><td>Compatible MySQL</td><td>No primera opción</td></tr>
+    <tr><td>Clever Cloud</td><td>Créditos/addons</td><td>Variable</td><td>Variable</td><td>Parcial</td><td>No free compute equivalente</td></tr>
+    <tr><td>Northflank</td><td>Sandbox</td><td>Limitada</td><td>No</td><td>Sí</td><td>Interesante, menos conveniente</td></tr>
+  </table>
+  <p>Fuentes: <a href="https://render.com/docs/free">Render</a>, <a href="https://docs.railway.com/pricing/free-trial">Railway</a>, <a href="https://fly.io/docs/about/pricing/">Fly.io</a>, <a href="https://www.koyeb.com/docs/reference/instances">Koyeb</a>, <a href="https://vercel.com/docs/plans/hobby">Vercel</a>, <a href="https://www.netlify.com/pricing/">Netlify</a>, <a href="https://developers.cloudflare.com/workers/platform/limits/">Cloudflare</a>, <a href="https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm">Oracle</a>, <a href="https://cloud.google.com/run/pricing">Cloud Run</a>, <a href="https://aiven.io/docs/products/mysql/concepts/mysql-free-tier">Aiven</a>, <a href="https://planetscale.com/docs/planetscale-plans">PlanetScale</a> y <a href="https://northflank.com/pricing">Northflank</a>.</p>
+
+  <h2>5. FRONTEND</h2>
+  <p>Vercel soporta correctamente SSR, Server Components, rutas dinámicas y route handlers, pero su Hobby está restringido a uso personal/no comercial. Render puede ejecutar el Dockerfile actual, aunque con 512 MB, 0,1 CPU y suspensión tras 15 minutos. Netlify y Cloudflare requerirían adaptar el runtime a sus modelos.</p>
+  <p>La opción más coherente con el despliegue posterior es ejecutar el frontend standalone en Docker dentro de la VM Oracle.</p>
+
+  <h2>6. BACKEND</h2>
+  <p>Render y Koyeb pueden ejecutar Java 21 mediante Docker, pero sus límites gratuitos son ajustados. El sleep detiene el EmailWorker y genera cold starts. Oracle permite ejecutar el backend con memoria holgada, Docker Compose y sin suspensión.</p>
+  <p>Para PRE, un cold start de aproximadamente un minuto sería aceptable, pero no es necesario aceptarlo en Oracle. El arranque de Spring Boot dependerá de JVM, MySQL y migraciones; debe probarse con el healthcheck de readiness.</p>
+
+  <h2>7. MYSQL</h2>
+  <p>Aiven ofrece MySQL gratuito indefinido, sin tarjeta, con 1 CPU, 1 GB RAM, 1 GB de almacenamiento y backups. Puede apagar servicios sin actividad prolongada y limita conexiones. Es la mejor DB gestionada gratuita.</p>
+  <p>Mi preferencia es MySQL 8.4 dentro de la VM Oracle con volumen persistente: misma versión, red privada, menor latencia y backups controlables. No recomiendo cambiar temporalmente a PostgreSQL; el repositorio usa driver, dialecto, esquema y migraciones MySQL.</p>
+
+  <h2>8. STORAGE</h2>
+  <p>Usaría un bucket S3 AWS real y separado para PRE. Es la mejor forma de probar presigned URLs, CORS y permisos similares a producción. Para el volumen previsto el coste posterior al free tier sería de céntimos. MinIO debe mantenerse para local; R2 es válido, pero introduce diferencias innecesarias.</p>
+
+  <h2>9. STRIPE</h2>
+  <p>Stripe Test Mode permite Checkout, webhooks, tarjetas de prueba y pagos sin movimiento de fondos. Configurar un webhook público HTTPS en <code>https://pre.midominio.es/api/webhooks/stripe</code> con claves y webhook secret exclusivos de PRE. Nunca usar claves live.</p>
+  <p><a href="https://docs.stripe.com/testing">Documentación oficial de testing de Stripe</a>.</p>
+
+  <h2>10. EMAIL</h2>
+  <p>La opción más segura es Mailpit dentro de la VM, con SMTP interno en el puerto 1025. El panel debe exponerse solo por SSH tunnel, Cloudflare Access o Basic Auth. Así se prueban registro, verificación y password reset sin posibilidad de enviar cientos de correos reales.</p>
+  <p>SES es técnicamente posible, pero no es la opción segura por defecto. Además, el free tier específico de SES cambió en julio de 2026; las nuevas cuentas dependen de los créditos AWS generales. <a href="https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-ses-pricing-plans/">Anuncio actual de SES</a>.</p>
+
+  <h2>11. DOMINIO / HTTPS / COOKIES</h2>
+  <p>Usaría <code>https://pre.midominio.es</code> como único origen público y Caddy enrutaría <code>/api/*</code> al backend. Esto evita los problemas actuales del frontend con la cookie CSRF: <code>api-pre.midominio.es</code> sería otro origen y la aplicación lee <code>XSRF-TOKEN</code> mediante <code>document.cookie</code>.</p>
+  <p>Configuración PRE: <code>AUTH_COOKIE_SECURE=true</code> y, con same-origin HTTPS, <code>AUTH_COOKIE_SAME_SITE=Strict</code>. Cloudflare DNS y TLS son gratuitos si el dominio ya existe.</p>
+
+  <h2>12. COMPARATIVA DE ARQUITECTURAS</h2>
+  <table><tr><th>Arquitectura</th><th>Coste</th><th>Complejidad</th><th>Similitud AWS</th><th>Sleep</th><th>Persistencia</th><th>Recomendación</th></tr>
+    <tr><td>Vercel + Render + Aiven</td><td>0–1 €/mes</td><td>Media</td><td>5/10</td><td>Sí</td><td>DB sí; runtimes no</td><td>Válida, no preferida</td></tr>
+    <tr><td>Oracle VM + Compose completo</td><td>0–0,30 €/mes</td><td>Media</td><td>9/10</td><td>No</td><td>Sí</td><td>Recomendada</td></tr>
+    <tr><td>Cloud Run + Aiven</td><td>0–1 €/mes</td><td>Media</td><td>6/10</td><td>Scale-to-zero</td><td>DB sí</td><td>Alternativa</td></tr>
+    <tr><td>Railway</td><td>1–5 €/mes</td><td>Baja</td><td>6/10</td><td>Variable</td><td>Limitada</td><td>No free permanente completa</td></tr>
+    <tr><td>AWS Free Tier</td><td>0 inicialmente</td><td>Media/alta</td><td>10/10</td><td>No</td><td>Sí</td><td>Buena para aprender AWS</td></tr>
+  </table>
+  <p>Puntuación general: Oracle 8,5/10; Railway 7,4/10; AWS 7,3/10; Render/Aiven 7,1/10; Cloud Run/Aiven 7,0/10; Koyeb/Aiven 6,7/10.</p>
+
+  <h2>13. OPCIÓN 0 €/MES</h2>
+  <pre>Oracle Cloud Always Free VM ARM
+  ├── Caddy
+  ├── frontend
+  ├── backend
+  ├── mysql
+  └── mailpit
+
+Cloudflare DNS + Stripe Test Mode
+S3 real opcional: 0–0,30 €/mes</pre>
+  <p>Para 0 € estricto se puede usar MinIO en PRE, pero S3 real ofrece una prueba más parecida a producción.</p>
+
+  <h2>14. OPCIÓN ≤5 €/MES</h2>
+  <p>Mantendría Oracle y gastaría solo opcionalmente en S3, dominio o una DB gestionada. Aiven Developer cuesta aproximadamente 5 USD/mes, pero no es necesario si MySQL corre en la VM y se hacen backups.</p>
+
+  <h2>15. LIMITACIONES DE PRE GRATUITA</h2>
+  <p>No será una réplica de producción: no probará de forma equivalente alta disponibilidad, Multi-AZ, failover RDS, autoscaling, ALB, IAM idéntico, CloudWatch, WAF AWS ni rendimiento bajo carga. Sí permitirá probar HTTPS, cookies Secure, JWT, CSRF, CORS, login, registro, password reset, emails capturados, inscripciones, Stripe Test/webhooks, uploads, MySQL, migraciones, Docker y healthchecks.</p>
+
+  <h2>16. RECOMENDACIÓN FINAL</h2>
+  <p><strong>Frontend:</strong> Next.js standalone en Docker dentro de Oracle.</p>
+  <p><strong>Backend:</strong> Spring Boot Java 21 en Docker dentro de Oracle.</p>
+  <p><strong>Database:</strong> MySQL 8.4 con volumen persistente.</p>
+  <p><strong>Storage:</strong> S3 AWS real, bucket PRE separado.</p>
+  <p><strong>Stripe:</strong> Test Mode y secrets exclusivos.</p>
+  <p><strong>Email:</strong> Mailpit protegido.</p>
+  <p><strong>DNS/HTTPS:</strong> Cloudflare + Caddy + <code>pre.midominio.es</code>.</p>
+
+  <h2>17. DIAGRAMA</h2>
+  <pre>Internet
+  │
+  ▼
+https://pre.midominio.es
+  │
+Cloudflare DNS / Access / TLS
+  │
+Oracle Cloud VM ARM
+  │
+Caddy
+  ├── /       → Next.js :3000
+  └── /api/*  → Spring Boot :8080
+                    ├── MySQL 8.4
+                    ├── AWS S3 PRE
+                    ├── Stripe TEST
+                    └── Mailpit SMTP interno</pre>
+
+  <h2>18. CAMBIOS NECESARIOS EN EL REPO</h2>
+  <p>No se han implementado. Serían necesarios:</p>
+  <ul>
+    <li>Crear <code>application-pre.properties</code>.</li>
+    <li>Crear documentación/plantilla de variables PRE.</li>
+    <li>Configurar <code>NEXT_PUBLIC_API_URL=/api</code>.</li>
+    <li>Añadir Caddyfile y Compose PRE o parametrizar el actual.</li>
+    <li>Crear seed de datos falsos.</li>
+    <li>Crear workflow GitHub Actions.</li>
+    <li>Añadir <code>robots.txt</code> y <code>noindex</code>.</li>
+    <li>Documentar migraciones y backups.</li>
+  </ul>
+  <p>Variables fundamentales: <code>SPRING_PROFILES_ACTIVE=pre</code>, credenciales MySQL, <code>JWT_SECRET</code>, <code>AUTH_COOKIE_SECURE=true</code>, <code>AUTH_COOKIE_SAME_SITE=Strict</code>, S3 PRE, Stripe test, Mailpit, <code>FRONTEND_PUBLIC_URL=https://pre.midominio.es</code> y <code>NEXT_PUBLIC_API_URL=/api</code>.</p>
+
+  <h2>19. PLAN PASO A PASO</h2>
+  <ol>
+    <li>Crear cuenta Oracle, elegir región y verificar capacidad ARM.</li>
+    <li>Crear VM de 2 OCPU, 12 GB RAM y volumen de 50–100 GB.</li>
+    <li>Instalar Linux, Docker Compose, firewall y acceso SSH.</li>
+    <li>Configurar Cloudflare DNS para <code>pre.midominio.es</code>.</li>
+    <li>Crear bucket S3 PRE privado y CORS.</li>
+    <li>Crear secretos PRE fuera del repositorio.</li>
+    <li>Levantar MySQL con volumen y ejecutar schema/migraciones.</li>
+    <li>Levantar Mailpit sin exposición pública directa.</li>
+    <li>Desplegar backend con perfil PRE y Actuator.</li>
+    <li>Desplegar frontend con API relativa <code>/api</code>.</li>
+    <li>Configurar Caddy y HTTPS.</li>
+    <li>Configurar Stripe Test webhook.</li>
+    <li>Crear seed de datos falsos.</li>
+    <li>Configurar push → build → deploy → smoke tests.</li>
+    <li>Configurar backups MySQL y prueba de restauración.</li>
+  </ol>
+
+  <h2>20. MIGRACIÓN FUTURA A AWS</h2>
+  <table><tr><th>PRE</th><th>Producción AWS</th></tr>
+    <tr><td>Dockerfile backend/frontend</td><td>Se mantienen</td></tr>
+    <tr><td>MySQL Docker</td><td>RDS MySQL</td></tr>
+    <tr><td>Bucket S3 PRE</td><td>Bucket S3 PROD</td></tr>
+    <tr><td>Mailpit</td><td>SES</td></tr>
+    <tr><td>Caddy</td><td>ALB/CloudFront/Nginx según arquitectura</td></tr>
+    <tr><td>Secretos locales de VM</td><td>Secrets Manager/Parameter Store/IAM Roles</td></tr>
+    <tr><td>Logs Docker</td><td>CloudWatch</td></tr>
+  </table>
+  <p>La estrategia mantiene Docker, Java 21, MySQL, S3 API, Stripe, JWT, CSRF, Actuator y migraciones. Principalmente cambian infraestructura, secretos, base de datos gestionada, email y observabilidad.</p>
+  <div class="answer"><strong>¿La desplegaría yo actualmente así como PRE?</strong><br>SÍ. Oracle Cloud Always Free + Docker Compose + MySQL persistente + Mailpit + Caddy + S3 AWS real ofrece el mejor equilibrio entre coste, compatibilidad, simplicidad razonable y similitud con AWS.</div>
+</main>
+</body>
+</html>

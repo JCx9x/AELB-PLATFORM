@@ -21,6 +21,8 @@ import es.aelb.backendweb.infrastructure.web.dto.request.CreateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.ManagementUpdateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateProfileRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.UserResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -80,14 +82,18 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<UserResponse>> findAll(
+    public ResponseEntity<?> findAll(
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "") String role,
             @RequestParam(defaultValue = "") String currentQuota,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
+        Pagination pagination = Pagination.of(page, size);
         Set<String> paidUserIds = Set.copyOf(quotaRepository.findPaidUserIdsByYear(LocalDate.now().getYear()));
+        if (currentQuota.isBlank()) {
+            return ResponseEntity.ok(PagedResponse.from(userRepository.findPage(pagination.page(), pagination.size(), search, role), UserResponse::from));
+        }
         List<UserResponse> all = userRepository.findAll().stream()
                 .filter(u -> search.isBlank()
                         || u.getFullName().toLowerCase().contains(search.toLowerCase())
@@ -105,12 +111,7 @@ public class UserController {
         int end   = Math.min(start + size, total);
         List<UserResponse> pageData = (start < total) ? all.subList(start, end) : List.of();
 
-        return ResponseEntity.ok()
-                .header("X-Total-Count", String.valueOf(total))
-                .header("X-Page", String.valueOf(page))
-                .header("X-Page-Size", String.valueOf(size))
-                .header("X-Total-Pages", String.valueOf((int) Math.ceil((double) total / size)))
-                .body(pageData);
+        return ResponseEntity.ok(new PagedResponse<>(pageData, page, size, total, (int) Math.ceil((double) total / size)));
     }
 
     /**

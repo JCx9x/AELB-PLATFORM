@@ -11,6 +11,8 @@ import es.aelb.backendweb.domain.team.valueobject.TeamId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateTeamRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateTeamRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.TeamResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import es.aelb.backendweb.infrastructure.web.dto.response.PublicTeamResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -42,11 +44,9 @@ public class TeamController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PublicTeamResponse>> findAll() {
-        List<PublicTeamResponse> list = teamRepository.findAll().stream()
-                .map(PublicTeamResponse::from)
-                .toList();
-        return ResponseEntity.ok(list);
+    public ResponseEntity<PagedResponse<PublicTeamResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(teamRepository.findPage(pagination.page(), pagination.size()), PublicTeamResponse::from));
     }
 
     @GetMapping("/{id}")
@@ -59,10 +59,9 @@ public class TeamController {
 
     /** Datos completos, únicamente para gestores y administradores. */
     @GetMapping("/admin")
-    public ResponseEntity<List<TeamResponse>> findAllForManagement() {
-        return ResponseEntity.ok(teamRepository.findAll().stream()
-                .map(TeamResponse::from)
-                .toList());
+    public ResponseEntity<PagedResponse<TeamResponse>> findAllForManagement(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(teamRepository.findPage(pagination.page(), pagination.size()), TeamResponse::from));
     }
 
     /** Detalle completo, únicamente para gestores y administradores. */

@@ -5,6 +5,7 @@ El backend utiliza una transactional outbox en MySQL. Los casos de uso crean el 
 ## Local
 
 ```bash
+cp .env.example .env
 docker compose up -d
 ```
 
@@ -14,9 +15,17 @@ Flujos verificables: registro y verificación, `/forgot-password`, `/reset-passw
 
 ## Configuración de producción
 
+Para producción no uses el Compose local. Utiliza `docker-compose.prod.yml`, que fuerza `SPRING_PROFILES_ACTIVE=prod` y `EMAIL_PROVIDER=ses`:
+
+```bash
+cp .env.prod.example .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+Variables relevantes:
+
 ```env
 APP_ENV=prod
-SPRING_PROFILES_ACTIVE=prod
 EMAIL_PROVIDER=ses
 EMAIL_FROM=noreply@midominio.es
 EMAIL_FROM_NAME=AELB

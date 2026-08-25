@@ -3,6 +3,7 @@ package es.aelb.backendweb.domain.user;
 import es.aelb.backendweb.domain.user.valueobject.Dni;
 import es.aelb.backendweb.domain.user.valueobject.Email;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,8 @@ public interface UserRepository {
     boolean        existsByEmail(Email email);
     boolean        existsByDni(Dni dni);
     List<User>     findAll();
+    PageResult<User> findPage(int page, int size);
+    PageResult<User> findPage(int page, int size, String search, String role);
     List<User>     findByTeamId(String teamId);
     void           delete(UserId id);
 }

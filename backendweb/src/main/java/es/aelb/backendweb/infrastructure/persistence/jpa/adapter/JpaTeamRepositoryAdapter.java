@@ -5,6 +5,8 @@ import es.aelb.backendweb.domain.team.TeamRepository;
 import es.aelb.backendweb.domain.team.valueobject.TeamId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.TeamJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringTeamJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -45,6 +47,11 @@ public class JpaTeamRepositoryAdapter implements TeamRepository {
         return jpaRepository.findAll().stream()
                 .map(TeamJpaMapper::toDomain)
                 .toList();
+    }
+
+    @Override public PageResult<Team> findPage(int page, int size) {
+        var result = jpaRepository.findAll(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(TeamJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

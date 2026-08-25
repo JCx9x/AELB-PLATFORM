@@ -5,6 +5,8 @@ import es.aelb.backendweb.domain.category.CategoryRepository;
 import es.aelb.backendweb.domain.category.valueobject.CategoryId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.CategoryJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringCategoryJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -45,6 +47,11 @@ public class JpaCategoryRepositoryAdapter implements CategoryRepository {
         return jpaRepository.findAll().stream()
                 .map(CategoryJpaMapper::toDomain)
                 .toList();
+    }
+
+    @Override public PageResult<Category> findPage(int page, int size) {
+        var result = jpaRepository.findAll(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(CategoryJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

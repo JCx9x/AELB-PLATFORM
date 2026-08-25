@@ -12,6 +12,8 @@ import es.aelb.backendweb.infrastructure.storage.PresignedUrlService;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateNewsRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateNewsRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.NewsResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,15 +50,15 @@ public class NewsController {
     }
 
     @GetMapping
-    public ResponseEntity<List<NewsResponse>> findPublished() {
-        return ResponseEntity.ok(newsRepository.findPublished().stream()
-                .map(this::toResponse).toList());
+    public ResponseEntity<PagedResponse<NewsResponse>> findPublished(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(newsRepository.findPage(pagination.page(), pagination.size(), true), this::toResponse));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<NewsResponse>> findAll() {
-        return ResponseEntity.ok(newsRepository.findAll().stream()
-                .map(this::toResponse).toList());
+    public ResponseEntity<PagedResponse<NewsResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(newsRepository.findPage(pagination.page(), pagination.size(), false), this::toResponse));
     }
 
     @GetMapping("/{id}")

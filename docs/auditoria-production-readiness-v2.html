@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><title>Auditoría de software y production readiness — AELB (v2)</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font-family: Arial, sans-serif; color:#202124; font-size:10pt; line-height:1.4; }
+h1 { color:#153b63; font-size:24pt; margin-bottom:4px; } h2 { color:#153b63; border-bottom:1px solid #b9c8d8; padding-bottom:3px; margin-top:22px; } h3 { color:#7a1f1f; margin-bottom:3px; }
+.subtitle { color:#5f6368; font-size:12pt; } .verdict { background:#f8d7da; border-left:6px solid #b42318; padding:12px; font-size:16pt; font-weight:bold; margin:16px 0; }
+.score { background:#eef5fb; border:1px solid #b9c8d8; padding:10px; font-size:16pt; font-weight:bold; }
+table { width:100%; border-collapse:collapse; margin:8px 0 14px; font-size:8.5pt; } th { background:#153b63; color:white; } th,td { border:1px solid #c8cdd3; padding:5px; vertical-align:top; } tr:nth-child(even) td { background:#f6f8fa; }
+.critical { color:#a40000; font-weight:bold; } .high { color:#c04a00; font-weight:bold; } .medium { color:#806000; font-weight:bold; } .ok { color:#1a7f37; font-weight:bold; } .small { font-size:8.5pt; color:#4d5156; }
+code { font-family:monospace; font-size:9pt; background:#f1f3f4; padding:1px 3px; } ul { margin-top:4px; } .pagebreak { page-break-before:always; }
+.tag-ok{background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:3px;font-weight:bold;} .tag-partial{background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-weight:bold;} .tag-fail{background:#fde2e1;color:#a40000;padding:1px 6px;border-radius:3px;font-weight:bold;} .tag-new{background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:3px;font-weight:bold;}
+</style></head>
+<body>
+<h1>Segunda auditoría de software y production readiness</h1>
+<div class="subtitle">Repositorio AELB · 19 de agosto de 2026 · Re-verificación de la auditoría del 18 de agosto de 2026</div>
+<div class="verdict">🔴 NO LISTO PARA PRODUCCIÓN</div>
+<div class="score">PRODUCTION READINESS: 52/100 <span style="font-weight:normal;font-size:11pt;">(auditoría anterior: 42/100)</span></div>
+
+<h2>1. Conclusión ejecutiva</h2>
+<p>Los tres bloqueantes CRITICAL de la auditoría anterior han tenido trabajo real: <b>C-01 y C-02 están corregidos y confirmados con tests dedicados</b> (<code>SecurityConfigAuthorizationTest</code>). C-03 sigue abierto. Pero esta segunda auditoría ha encontrado algo más grave que cualquier hallazgo de la lista anterior: <b>el backend no compila sus tests, y como consecuencia la imagen Docker del backend no se puede construir en absoluto ahora mismo</b>. Se ha comprobado ejecutando <code>docker build</code> real contra el <code>Dockerfile</code> del repositorio — falla. No es una sospecha: es un hecho reproducible, documentado en el §19.</p>
+<p>La causa es una regresión: un trabajo en curso de paginación SQL real (<code>UserRepository.findPage(...)</code>) cambió una interfaz de dominio, y un stub de test (<code>EmailServiceAdapterTest.java</code>) quedó desincronizado. Es un fix de una línea, pero hoy, en este commit, no existe forma de producir un artefacto backend desplegable ni de ejecutar ninguno de los ~35 tests del proyecto — incluidos los que demuestran que C-01/C-02 están arreglados.</p>
+
+<h2>2. Cambios desde la auditoría anterior</h2>
+<ul>
+<li>Matcher específico y anterior en orden para <code>/api/championships/*/registrations/pdf</code> (C-01).</li>
+<li><code>PUT /api/users/*/admin</code> restringido a <code>hasRole("ADMIN")</code>; GESTOR ya no puede tocarlo (C-02).</li>
+<li>Reserva de inscripción <b>antes</b> de ir a Stripe, no después (H-02).</li>
+<li>Session binding, locks pesimistas, validación de importe/usuario/año e idempotencia en confirmación de cuota (H-03).</li>
+<li>Logging con <code>correlationId</code> correlacionable en el webhook de Stripe (H-06, mejora parcial).</li>
+<li><code>FileUploadValidator</code> con magic bytes reales para documentos/resultados/PDF (H-04, parcial).</li>
+<li>Sistema completo de recuperación de contraseña/verificación de email: outbox transaccional, worker con retry+backoff+rate limit, SES en prod / Mailpit en local con validación fail-fast (H-05, prácticamente nuevo).</li>
+<li><code>application-prod.properties</code> + <code>EmailConfigurationValidator</code> que impide arrancar en <code>prod</code> con secretos de email faltantes o con clave de cifrado de ejemplo.</li>
+<li>Actuator con liveness/readiness separados correctamente; graceful shutdown configurado.</li>
+<li>Suite de tests backend ampliada de "muy limitada" a ~18 clases de test.</li>
+<li>Framework de tests frontend (Vitest + Testing Library, 19 tests) añadido — no existía antes.</li>
+<li><b>Regresión nueva</b>: el cambio de paginación rompió la compilación de tests y, con ello, el build Docker del backend.</li>
+</ul>
+
+<div class="pagebreak"></div>
+<h2>3. Verificación C-01 → C-03</h2>
+<h3 class="ok">✅ C-01 — PDF de inscripciones público — SOLUCIONADO, CONFIRMADO</h3>
+<p><code>SecurityConfig.java:99-105</code>: matcher específico <code>GET /api/championships/*/registrations/pdf → hasAnyRole("GESTOR","ADMIN")</code> declarado <b>antes</b> del <code>permitAll()</code> genérico (línea 105). Doble protección: <code>RegistrationController.java:206-209</code> repite el chequeo de rol manualmente. Test dedicado: <code>SecurityConfigAuthorizationTest.registrationPdfRequiresAuthentication</code> (anónimo → 401). Hueco de cobertura: no hay test que compruebe 403 para rol USER autenticado. No bloquea.</p>
+<h3 class="ok">✅ C-02 — GESTOR podía promover a ADMIN — SOLUCIONADO, CONFIRMADO</h3>
+<p><code>SecurityConfig.java:157</code>: <code>PUT /api/users/*/admin → hasRole("ADMIN")</code> (ya no <code>hasAnyRole</code>). El único DTO con campo <code>role</code> (<code>AdminUpdateUserRequest</code>) solo se usa en esa ruta; <code>ManagementUpdateUserRequest</code> (la que GESTOR sí puede usar) no tiene campo <code>role</code> ni <code>blocked</code>. Test dedicado: <code>gestorCannotChangeRoleOrBlockedStatus</code> → 403. No bloquea.</p>
+<h3 class="critical">🔴 C-03 — Docker Compose con configuración local — SIGUE PRESENTE</h3>
+<p>Un único <code>docker-compose.yml</code>, sin separación dev/prod: <code>SPRING_PROFILES_ACTIVE: local</code> hardcodeado (línea 122), <code>AUTH_COOKIE_SECURE:-false</code> (línea 125), MySQL publicado <code>3307:3306</code>, MinIO publicado <code>9000/9001</code> con imágenes <code>latest</code> y credenciales <code>minioadmin</code> por defecto. El <i>código</i> de la app (perfil <code>prod</code>, <code>S3Config</code> con IAM Role, <code>EmailConfigurationValidator</code>) ya está bien preparado — el problema es que nada activa automáticamente esa configuración; sigue dependiendo al 100% de que un humano lo haga bien a mano. Bloquea.</p>
+
+<h2>4. Verificación H-01 → H-08</h2>
+<table><tr><th>ID</th><th>Estado</th><th>Evidencia clave</th></tr>
+<tr><td>H-01 Migraciones manuales</td><td class="tag-partial">🔴 SIGUE (mitigado)</td><td>Sin Flyway/Liquibase. <code>schema.sql</code> verificado coherente con las 13 migraciones. Ninguna es destructiva; la de <code>birth_date NOT NULL</code> falla intencionadamente y de forma segura. No bloquea BD nueva; 100% manual en BD existente.</td></tr>
+<tr><td>H-02 Pago sin inscripción</td><td class="tag-ok">✅ SOLUCIONADO</td><td><code>CreateStripeChampionshipBasketCheckoutUseCase</code> reserva la inscripción PENDING antes de crear la sesión Stripe; el webhook solo transiciona PENDING→PAID. Ya no existe el escenario "cobrado sin inscribir".</td></tr>
+<tr><td>H-03 Webhook cuota sin session binding</td><td class="tag-ok">✅ SOLUCIONADO (gap menor)</td><td>Lock pesimista + <code>@Transactional</code> + búsqueda por <code>stripe_session_id</code> UNIQUE + validación usuario/año/importe + idempotencia vía <code>isPaid()</code>. Gap: basket/registro no revalidan importe/divisa del webhook (mitigado, el total lo fija el propio backend de forma inmutable).</td></tr>
+<tr><td>H-04 Uploads sin límites</td><td class="tag-partial">🟡 PARCIAL</td><td>Documentos/resultados: magic bytes + límite real ✅. Noticias/campeonatos: S3 con whitelist ✅. Nuevo hallazgo: logo de equipos sin ningún límite ni validación (ver N-03).</td></tr>
+<tr><td>H-05 Password reset / email</td><td class="tag-ok">✅ SOLUCIONADO</td><td>Outbox transaccional + worker con retry exponencial+jitter, tokens hasheados+expiración+un solo uso, no-enumeración con trabajo dummy, cooldown y máximo/hora server-side, SES/Mailpit por perfil con validación fail-fast.</td></tr>
+<tr><td>H-06 Stripe errores silenciosos</td><td class="tag-partial">🟡 MEJORADO</td><td><code>correlationId</code> en cada línea de log; evento/sessionId logueados en la recepción. Ya no es caja negra.</td></tr>
+<tr><td>H-07 Sin CI/CD</td><td class="tag-fail">🔴 SIGUE</td><td>Sin <code>.github/workflows</code> ni equivalente, nunca ha existido en el historial de git.</td></tr>
+<tr><td>H-08 Frontend lint falla</td><td class="tag-fail">🔴 SIGUE, SIN CAMBIOS</td><td><b>16 errores, 22 warnings — número idéntico a la auditoría anterior.</b> <code>next build</code> sí compila.</td></tr>
+</table>
+
+<h2>5. Verificación M-01 → M-08</h2>
+<table><tr><th>ID</th><th>Estado</th><th>Evidencia</th></tr>
+<tr><td>M-01 Aforo</td><td class="tag-fail">🔴 Confirmado ausente (no es bug)</td><td>Sin <code>capacity</code>/<code>maxParticipants</code> en dominio ni esquema.</td></tr>
+<tr><td>M-02 Concurrencia inscripciones</td><td class="tag-partial">🟡 Mitigado por BD</td><td>Read-check-write sin lock explícito, protegido por UNIQUE de BD.</td></tr>
+<tr><td>M-03 Security headers</td><td class="tag-fail">🔴 SIGUE</td><td>Sin CSP ni Referrer-Policy explícitos; solo defaults de Spring Security.</td></tr>
+<tr><td>M-04 Rate limiting en memoria</td><td class="tag-partial">ℹ️ No bloqueante</td><td>Una sola instancia de backend — aceptable a este volumen.</td></tr>
+<tr><td>M-05 Paginación</td><td class="tag-partial">🟡 PARCIAL</td><td>Listado normal con SQL real; filtro por cuota sigue en memoria.</td></tr>
+<tr><td>M-06 Límites Base64</td><td class="tag-fail">🔴 SIGUE, inconsistente</td><td>Documentos/resultados con límite; <code>Team.logoBase64</code> sin ninguno.</td></tr>
+<tr><td>M-07 Borrado de usuarios</td><td class="tag-fail">🔴 Confirmado — 500 genérico</td><td>FK RESTRICT sin <code>@ExceptionHandler</code> dedicado; sin pérdida de datos, sí UX rota.</td></tr>
+<tr><td>M-08 Vulnerabilidades npm</td><td class="tag-ok">✅ SOLUCIONADO</td><td><code>npm audit --omit=dev</code> → 0 vulnerabilidades.</td></tr>
+</table>
+
+<div class="pagebreak"></div>
+<h2>6. Nuevos hallazgos desde la auditoría anterior</h2>
+<h3 class="high">N-01 — <code>@PreAuthorize</code> sin efecto por falta de <code>@EnableMethodSecurity</code> · HIGH (latente) · CONFIRMADO</h3>
+<p><code>PricingController</code>/<code>ChampionshipPricingController</code> usan <code>@PreAuthorize</code>, pero no existe <code>@EnableMethodSecurity</code> en el proyecto — son código muerto. No explotable hoy porque <code>SecurityConfig</code> respalda esas rutas con matchers equivalentes, pero es el mismo patrón que causó C-01.</p>
+<h3 class="critical">N-02 — Backend no compila sus tests / imagen Docker no se puede construir · CRITICAL · CONFIRMADO (ejecutado)</h3>
+<p><code>EmailServiceAdapterTest.java:24</code> — el stub <code>UserRepositoryAdapterStub</code> no implementa los nuevos <code>findPage(int,int)</code>/<code>findPage(int,int,String,String)</code> de <code>UserRepository.java:25-26</code>. Confirmado con <code>mvn clean verify</code> real y con <code>docker build</code> real — ambos fallan, incluso con <code>-DskipTests</code>. Ver §19.</p>
+<h3 class="high">N-03 — Logo de equipos: sin límite/validación + XSS almacenado vía Content-Type · MEDIUM-HIGH · CONFIRMADO</h3>
+<p><code>CreateTeamRequest</code>/<code>UpdateTeamRequest</code>: <code>logoBase64</code>/<code>logoType</code> sin ninguna anotación de validación. <code>TeamController.getLogo</code> (endpoint público) hace <code>MediaType.parseMediaType(team.getLogoType())</code> con el valor declarado por el cliente. Un GESTOR podría subir <code>logoType=text/html</code> con payload malicioso; cualquier visitante que abra <code>/api/teams/{id}/logo</code> lo recibiría como HTML ejecutable.</p>
+<h3 class="medium">N-04 — Falta <code>.dockerignore</code> en ambos módulos · MEDIUM</h3>
+<p>El frontend hace <code>COPY . .</code> sin filtro; riesgo de incluir <code>.env</code>/<code>.git</code> en el contexto de build.</p>
+<h3 class="medium">N-05 — Sin <code>HEALTHCHECK</code> en Dockerfiles/compose · LOW-MEDIUM</h3>
+<p>Pese a que Actuator ya expone liveness/readiness correctamente configurados.</p>
+<h3 class="medium">N-06 — <code>AUTH_COOKIE_SECURE</code> con default <code>false</code> incluso en el perfil base · LOW-MEDIUM</h3>
+<p><code>application.properties:31</code>. Refuerza por qué C-03 sigue siendo real: la seguridad es opt-in, no por defecto.</p>
+<h3>N-07 — <code>CancelRegistrationUseCase</code> rechaza toda cancelación incondicionalmente · INFO, verificar intención</h3>
+<p><code>CancelRegistrationUseCase.java:19-21</code> lanza excepción sin mirar quién llama ni el estado. Puede ser una política de negocio deliberada, pero hoy es indistinguible de un bug.</p>
+
+<h2>7. Seguridad</h2>
+<p>Autenticación: JWT en cookie HttpOnly, <code>Secure</code> configurable (N-06), <code>SameSite=Strict</code> por defecto, refresh token rotatorio hasheado, <code>tokenVersion</code> que revoca sesiones. CSRF: patrón doble-cookie coherente con el uso del frontend. Autorización: auditoría IDOR/BOLA completa sobre los 15 controladores — sin hallazgos explotables más allá de C-01/C-02 (corregidos) y N-01 (latente). Contenido no publicado correctamente filtrado. CORS con lista blanca, sin wildcard. Frontend: sin <code>dangerouslySetInnerHTML</code>, único <code>NEXT_PUBLIC_*</code> es la URL de API, sin tokens en <code>localStorage</code>.</p>
+
+<h2>8. Pagos Stripe</h2>
+<p>Firma HMAC-SHA256 en tiempo constante + tolerancia de replay 300s. Idempotency-Key determinista al crear sesiones. Los tres flujos de confirmación son <code>@Transactional</code> con lock pesimista e idempotencia de negocio vía <code>isPaid()</code>. Session binding por ID único en BD. Importe/usuario/año validados en cuota; basket/registro no revalidan importe del webhook (mitigado). Sin aforo modelado (confirmado, no bug si no se requiere). Cobertura de test (leída, no ejecutada): cubre pago válido, metadata de otro usuario, importe manipulado. No cubre: firma inválida, sesión desconocida, session mismatch, webhook retrasado, idempotencia explícita, fallo de materialización.</p>
+
+<h2>9. Base de datos y migraciones</h2>
+<p>Esquema con FKs, UNIQUE y NOT NULL correctos. Sin Flyway/Liquibase; <code>schema.sql</code> verificado coherente con las 13 migraciones (comprobación estática contra entidades JPA). Ninguna migración destructiva. Índice recomendable ausente: <code>quotas(year, payment_status)</code>.</p>
+
+<h2>10. Concurrencia</h2>
+<p>Doble inscripción y cuota duplicada protegidas por UNIQUE de BD, no solo por check en Java. <code>RegisterForChampionshipUseCase</code> es read-check-write sin lock explícito pero con la constraint como red de seguridad final (no verificado si la excepción de integridad resultante se traduce a un mensaje de dominio legible).</p>
+
+<h2>11. Email</h2>
+<p>Outbox transaccional con recuperación de jobs abandonados. Worker con rate limiter no bloqueante, retry con backoff exponencial+jitter, excepciones permanentes vs temporales. Simulando 10.000 emails pendientes: se procesan en lotes respetando <code>maxPerSecond</code>, no se envían simultáneamente. SES solo activable en perfil <code>prod</code> (validación fail-fast); Mailpit en local/dev. Ni el token de reset ni el de verificación aparecen en ningún log.</p>
+
+<h2>12. Observabilidad</h2>
+<p><code>CorrelationIdFilter</code> añade <code>X-Correlation-ID</code> a toda respuesta y al MDC; patrón de log lo incluye en cada línea. Liveness/readiness correctamente separados (liveness no depende de BD/proveedores externos). Graceful shutdown configurado. No verificado en runtime (la app no se ha llegado a arrancar en esta auditoría de solo lectura) — correcto sobre el papel, confirmado por código.</p>
+
+<h2>13. Frontend</h2>
+<p>Sin XSS vía <code>dangerouslySetInnerHTML</code>. CSRF integrado en todas las llamadas mutantes. Manejo de errores centralizado sin exponer stack traces. Único env var expuesto no sensible. Nada de credenciales en <code>localStorage</code>.</p>
+
+<h2>14. Backend</h2>
+<p>Arquitectura hexagonal consistente. Nota de mantenibilidad: parte de la infraestructura más nueva (email, Stripe webhook) está escrita en estilo muy condensado (clases en una línea), contrastando con el resto del código bien formateado — dificulta la revisión sin ser un problema funcional.</p>
+
+<h2>15. Tests</h2>
+<p>Unit/dominio: sí. Seguridad/API (MockMvc): sí. Stripe: sí, parcial. Uploads: sí. Email: sí. Concurrencia real, migraciones, E2E: no existen. <b>Ninguno se ha podido ejecutar en esta auditoría</b> — el módulo no compila. Bug crítico que podría entrar ahora sin que ningún test lo detecte: cualquier regresión en inscripción/Stripe/SecurityConfig, porque el pipeline que lo pillaría no corre — ni local de forma fiable, ni en CI (inexistente).</p>
+
+<h2>16. CI/CD</h2>
+<p>No existe. Confirmado por búsqueda en el árbol actual y en todo el historial de git — nunca ha existido.</p>
+
+<h2>17. Docker / AWS</h2>
+<p>Backend Dockerfile: multi-stage, no-root, imagen fijada por versión. <b>Build real ejecutado: FALLA</b> (mismo error de N-02). Frontend Dockerfile: mismo patrón correcto. <b>Build real ejecutado: ÉXITO</b>, no-root confirmado. Ninguno tiene <code>HEALTHCHECK</code> ni <code>.dockerignore</code>. AWS: <code>S3Config</code> soporta IAM Role condicionado a <code>STORAGE_USE_IAM=true</code>, sin credenciales hardcodeadas. <code>.env</code> real (no trackeado, en <code>.gitignore</code>, nunca commiteado) contiene clave Stripe de <b>test</b>, no de producción.</p>
+
+<h2>18. Backups / Rollback</h2>
+<p>Sin estrategia de backup recurrente documentada. Sin restauración probada nunca. Sin procedimiento de rollback más allá de git.</p>
+
+<div class="pagebreak"></div>
+<h2>19. Checks ejecutados</h2>
+<table><tr><th>Check</th><th>Resultado</th></tr>
+<tr><td>Maven build (compile, JDK 21 real)</td><td class="ok">✅ PASS — 323 ficheros, sin errores</td></tr>
+<tr><td>Maven test-compile / <code>mvn clean verify</code></td><td class="critical">🔴 FAIL — stub no implementa <code>findPage</code></td></tr>
+<tr><td>Backend tests (surefire)</td><td class="high">⛔ NO EJECUTADOS — bloqueados</td></tr>
+<tr><td>Docker build backend</td><td class="critical">🔴 FAIL — mismo error, incluso con <code>-DskipTests</code></td></tr>
+<tr><td>Docker build frontend</td><td class="ok">✅ PASS — no-root confirmado</td></tr>
+<tr><td>Frontend <code>npm ci</code></td><td class="ok">✅ PASS</td></tr>
+<tr><td>Frontend <code>npm run lint</code></td><td class="critical">🔴 FAIL — 16 errores, 22 warnings (idéntico a antes)</td></tr>
+<tr><td>Frontend <code>npm run build</code></td><td class="ok">✅ PASS — 27 rutas</td></tr>
+<tr><td>Frontend tests (<code>vitest run</code>)</td><td class="ok">✅ PASS — 19/19</td></tr>
+<tr><td><code>npm audit --omit=dev</code></td><td class="ok">✅ PASS — 0 vulnerabilidades</td></tr>
+<tr><td>DB migrations</td><td class="ok">✅ PASS (razonamiento estático, sin MySQL real)</td></tr>
+<tr><td>Security tests (leídos)</td><td class="high">⛔ NO EJECUTADOS — correctos por lectura estática</td></tr>
+<tr><td>Stripe tests (leídos)</td><td class="high">⛔ NO EJECUTADOS — cobertura parcial</td></tr>
+</table>
+
+<h2>20. Tabla completa de hallazgos</h2>
+<table><tr><th>ID</th><th>Estado</th><th>Evidencia</th><th>Comentario</th></tr>
+<tr><td>C-01</td><td class="tag-ok">✅</td><td>SecurityConfig.java:99-105 + test</td><td>Solucionado y probado</td></tr>
+<tr><td>C-02</td><td class="tag-ok">✅</td><td>SecurityConfig.java:157 + test</td><td>Solucionado y probado</td></tr>
+<tr><td>C-03</td><td class="tag-fail">🔴</td><td>docker-compose.yml:40,64,122,125</td><td>Sin cambios</td></tr>
+<tr><td>H-01</td><td class="tag-fail">🔴 (mitigado)</td><td>Sin Flyway; schema.sql coherente</td><td>No bloquea BD nueva</td></tr>
+<tr><td>H-02</td><td class="tag-ok">✅</td><td>Reserva antes de pagar</td><td>—</td></tr>
+<tr><td>H-03</td><td class="tag-ok">✅ (gap menor)</td><td>Lock+transacción+session binding</td><td>Falta validar importe en basket/registro</td></tr>
+<tr><td>H-04</td><td class="tag-partial">🟡</td><td>FileUploadValidator</td><td>Nuevo hueco: logo de equipos (N-03)</td></tr>
+<tr><td>H-05</td><td class="tag-ok">✅</td><td>Outbox+worker+SES/Mailpit</td><td>Prácticamente nuevo</td></tr>
+<tr><td>H-06</td><td class="tag-partial">🟡</td><td>correlationId en logs</td><td>Ya no es caja negra</td></tr>
+<tr><td>H-07</td><td class="tag-fail">🔴</td><td>Sin .github/workflows</td><td>Sin cambios</td></tr>
+<tr><td>H-08</td><td class="tag-fail">🔴</td><td>16 errores lint</td><td>Sin cambios, mismo número</td></tr>
+<tr><td>M-01</td><td class="tag-fail">🔴 (no es bug)</td><td>Sin capacity en dominio</td><td>—</td></tr>
+<tr><td>M-02</td><td class="tag-partial">🟡</td><td>Protegido por UNIQUE</td><td>Sin lock explícito</td></tr>
+<tr><td>M-03</td><td class="tag-fail">🔴</td><td>Sin CSP/Referrer-Policy</td><td>—</td></tr>
+<tr><td>M-04</td><td class="tag-partial">ℹ️</td><td>Una instancia</td><td>No bloquea a este volumen</td></tr>
+<tr><td>M-05</td><td class="tag-partial">🟡</td><td>findPage parcial</td><td>Filtro por cuota en memoria</td></tr>
+<tr><td>M-06</td><td class="tag-fail">🔴</td><td>Límites inconsistentes</td><td>Team.logoBase64 sin límite</td></tr>
+<tr><td>M-07</td><td class="tag-fail">🔴</td><td>FK RESTRICT + 500 genérico</td><td>Sin pérdida de datos, sí UX rota</td></tr>
+<tr><td>M-08</td><td class="tag-ok">✅</td><td>npm audit limpio</td><td>—</td></tr>
+<tr><td>N-01</td><td class="tag-new">⚠️ nuevo</td><td>@PreAuthorize inerte</td><td>No explotable hoy</td></tr>
+<tr><td>N-02</td><td class="tag-new">⚠️ nuevo CRITICAL</td><td>Build backend roto</td><td>Confirmado ejecutando</td></tr>
+<tr><td>N-03</td><td class="tag-new">⚠️ nuevo</td><td>Logo equipo sin validar</td><td>XSS almacenado posible</td></tr>
+</table>
+
+<h2>21. Production readiness score</h2>
+<table><tr><th>Área</th><th>Puntuación</th><th>Motivo</th></tr>
+<tr><td>Seguridad</td><td>7/10</td><td>C-01/C-02 corregidos y probados; faltan headers y @EnableMethodSecurity; hueco en logo de equipos</td></tr>
+<tr><td>Fiabilidad</td><td>6/10</td><td>Stripe genuinamente más fiable; sin red de tests activa hacia adelante</td></tr>
+<tr><td>Base de datos</td><td>6/10</td><td>Buen esquema, coherente; sin herramienta de migración</td></tr>
+<tr><td>Arquitectura</td><td>8/10</td><td>Hexagonal consistente, pagos/email bien diseñados</td></tr>
+<tr><td>Calidad de código</td><td>3/10</td><td>Build roto; lint sin cambios; estilo inconsistente en módulos nuevos</td></tr>
+<tr><td>Tests</td><td>3/10</td><td>Buena cobertura sobre el papel, cero ejecutable hoy</td></tr>
+<tr><td>Observabilidad</td><td>7/10</td><td>correlationId, health separado, graceful shutdown — confirmado en código</td></tr>
+<tr><td>Configuración</td><td>5/10</td><td>Perfil prod bien preparado; el compose que se usaría no lo activa</td></tr>
+<tr><td>Deployment</td><td>2/10</td><td>Sin CI/CD y, ahora, sin poder construir la imagen backend</td></tr>
+<tr><td>Mantenibilidad</td><td>5/10</td><td>Arquitectura clara; estilo condensado nuevo reduce legibilidad</td></tr>
+</table>
+<div class="score">PRODUCTION READINESS: 52/100</div>
+
+<h2>22. Bloqueantes actuales</h2>
+<p><b>BLOQUEANTES REALES PARA DESPLEGAR HOY:</b></p>
+<ol>
+<li>El backend no compila sus tests y su imagen Docker no se puede construir (N-02) — arreglar el stub <code>UserRepositoryAdapterStub</code> en <code>EmailServiceAdapterTest.java</code> para implementar <code>findPage(int,int)</code>/<code>findPage(int,int,String,String)</code>.</li>
+<li><code>docker-compose.yml</code> sigue sin separación dev/prod (C-03) — perfil local forzado, cookies inseguras por defecto, puertos de MySQL/MinIO publicados, credenciales por defecto.</li>
+</ol>
+<p>Eso es todo lo que impide técnicamente el despliegue de este commit exacto. Todo lo demás es riesgo asumible o mejora, no bloqueo literal.</p>
+
+<h2>23. Riesgos aceptables v1</h2>
+<ul>
+<li><b>H-01</b> (sin Flyway) — asumible con disciplina manual documentada; revisar antes de crecer.</li>
+<li><b>H-07</b> (sin CI/CD) — asumible para un lanzamiento manual cuidadoso una vez resuelto el bloqueante 1; no indefinidamente.</li>
+<li><b>M-03</b> (sin CSP/HSTS explícitos) — asumible, barato de añadir en el reverse proxy al desplegar.</li>
+<li><b>M-04</b> (rate limiter en memoria) — correcto para una sola instancia.</li>
+<li><b>M-07</b> (borrado de usuario → 500) — molesto, no peligroso; la BD protege la integridad.</li>
+<li><b>N-01</b> (@PreAuthorize inerte) — no explotable hoy; corregir antes de añadir endpoints que confíen en él.</li>
+<li><b>N-03</b> (logo de equipo) — mitigado por ser rol de confianza; corregir antes de ampliar el número de gestores.</li>
+</ul>
+
+<h2>24. Top 3 incidentes probables</h2>
+<p><b>1. Desplegar con el compose actual sin overrides manuales completos.</b> Probabilidad: media-alta. Impacto: alto (cookies no-Secure, posible exposición de MySQL/MinIO). Mitigación existente: ninguna automática. Acción pendiente: separar compose prod o forzar variables críticas.</p>
+<p><b>2. Una cuenta GESTOR sube un logo de equipo malicioso.</b> Probabilidad: baja. Impacto: medio-alto (XSS almacenado público). Mitigación existente: solo el rol de confianza. Acción pendiente: aplicar FileUploadValidator/whitelist a <code>Team.logoBase64</code>.</p>
+<p><b>3. Una regresión futura en pago/inscripción pasa desapercibida por falta de tests ejecutándose.</b> Probabilidad: media. Impacto: alto. Mitigación existente: los tests existen pero no corren. Acción pendiente: arreglar el bloqueante 1 y conectar CI mínimo con <code>mvn verify</code> en cada push.</p>
+
+<h2>25. Veredicto final</h2>
+<div class="verdict">🔴 NO LISTO PARA PRODUCCIÓN</div>
+<p>No por falta de progreso — hay progreso real y verificado en autorización, pagos y email — sino porque este commit exacto no produce un artefacto backend desplegable, y el compose que se usaría para desplegarlo sigue siendo inseguro por defecto. Ambos son arreglables en horas, no en semanas, pero hoy son bloqueantes reales, reproducidos por ejecución directa, no teóricos.</p>
+
+<h2>26. Deploy / no deploy</h2>
+<p><b>MI RECOMENDACIÓN: NO DEPLOY</b></p>
+<p>Lista mínima exacta a resolver antes de desplegar:</p>
+<ol>
+<li>Arreglar <code>EmailServiceAdapterTest.java</code> (implementar los métodos <code>findPage</code> que faltan en el stub) y confirmar <code>mvn clean verify</code> + <code>docker build -f backendweb/Dockerfile .</code> en verde.</li>
+<li>Crear una configuración de despliegue real distinta del <code>docker-compose.yml</code> local: <code>SPRING_PROFILES_ACTIVE=prod</code>, <code>AUTH_COOKIE_SECURE=true</code> forzado, sin publicar puertos de MySQL/MinIO, sin credenciales por defecto.</li>
+</ol>
+<p>Con solo esos dos puntos resueltos (ambos de alcance pequeño), y aceptando los riesgos del §23 como deuda técnica de v1, el veredicto pasaría razonablemente a 🟡 LISTO CON RIESGOS CONOCIDOS.</p>
+</body></html>

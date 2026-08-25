@@ -11,6 +11,8 @@ import es.aelb.backendweb.domain.result.valueobject.ResultId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateResultRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateResultRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.ResultResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import es.aelb.backendweb.infrastructure.storage.FileStorage;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
@@ -53,15 +55,15 @@ public class ResultController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ResultResponse>> findPublished() {
-        return ResponseEntity.ok(resultRepository.findPublished().stream()
-                .map(ResultResponse::from).toList());
+    public ResponseEntity<PagedResponse<ResultResponse>> findPublished(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(resultRepository.findPage(pagination.page(), pagination.size(), true), ResultResponse::from));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<ResultResponse>> findAll() {
-        return ResponseEntity.ok(resultRepository.findAll().stream()
-                .map(ResultResponse::from).toList());
+    public ResponseEntity<PagedResponse<ResultResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(resultRepository.findPage(pagination.page(), pagination.size(), false), ResultResponse::from));
     }
 
     @GetMapping("/{id}")

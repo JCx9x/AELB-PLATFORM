@@ -26,6 +26,8 @@ import es.aelb.backendweb.infrastructure.web.dto.request.UpdatePaymentStatusRequ
 import es.aelb.backendweb.infrastructure.web.dto.request.ChangeRegistrationCategoryRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.AdminRegistrationResponse;
 import es.aelb.backendweb.infrastructure.web.dto.response.RegistrationResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import es.aelb.backendweb.infrastructure.pdf.ChampionshipRegistrationsPdfGenerator;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringCategoryJpaRepository;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringUserJpaRepository;
@@ -138,9 +140,11 @@ public class RegistrationController {
     }
 
     @GetMapping("/api/users/{userId}/registrations")
-    public ResponseEntity<List<RegistrationResponse>> findByUser(
+    public ResponseEntity<PagedResponse<RegistrationResponse>> findByUser(
             @PathVariable String userId,
-            Authentication authentication
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
     ) {
         String callerId      = (String) authentication.getPrincipal();
         boolean isPrivileged = authentication.getAuthorities().stream()
@@ -151,7 +155,9 @@ public class RegistrationController {
             return ResponseEntity.status(403).build();
         }
 
-        List<Registration> registrations = registrationRepository.findByUser(UserId.of(userId));
+        Pagination pagination = Pagination.of(page, size);
+        var result = registrationRepository.findPageByUser(UserId.of(userId), pagination.page(), pagination.size());
+        List<Registration> registrations = result.content();
         List<RegistrationResponse> responses = registrations.stream()
                 .map(reg -> {
                     Optional<Championship> ch  = championshipRepository.findById(reg.getChampionshipId());
@@ -162,13 +168,15 @@ public class RegistrationController {
                 .filter(r -> r != null)
                 .toList();
 
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(new PagedResponse<>(responses, result.page(), result.size(), result.totalElements(), result.totalPages()));
     }
 
     @GetMapping("/api/championships/{championshipId}/registrations")
-    public ResponseEntity<List<AdminRegistrationResponse>> findByChampionship(
+    public ResponseEntity<PagedResponse<AdminRegistrationResponse>> findByChampionship(
             @PathVariable String championshipId,
-            Authentication authentication
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
     ) {
         boolean isPrivileged = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_GESTOR")
@@ -178,9 +186,9 @@ public class RegistrationController {
             return ResponseEntity.status(403).build();
         }
 
-        List<Registration> registrations = registrationRepository.findByChampionship(
-                ChampionshipId.of(championshipId)
-        );
+        Pagination pagination = Pagination.of(page, size);
+        var result = registrationRepository.findPageByChampionship(ChampionshipId.of(championshipId), pagination.page(), pagination.size());
+        List<Registration> registrations = result.content();
 
         List<AdminRegistrationResponse> responses = registrations.stream()
                 .map(reg -> {
@@ -192,7 +200,7 @@ public class RegistrationController {
                 .filter(r -> r != null)
                 .toList();
 
-        return ResponseEntity.ok(responses);
+        return ResponseEntity.ok(new PagedResponse<>(responses, result.page(), result.size(), result.totalElements(), result.totalPages()));
     }
 
     @GetMapping(value = "/api/championships/{championshipId}/registrations/pdf", produces = MediaType.APPLICATION_PDF_VALUE)

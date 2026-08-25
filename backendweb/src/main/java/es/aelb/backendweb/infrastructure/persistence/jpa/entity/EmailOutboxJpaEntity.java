@@ -15,7 +15,7 @@ public class EmailOutboxJpaEntity {
     @Id @Column(length = 36, nullable = false) private String id = UUID.randomUUID().toString();
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 40) private EmailType type;
     @Column(nullable = false, length = 255) private String recipient;
-    @Lob @Column(nullable = false) private String payload;
+    @Lob @Column(nullable = false, columnDefinition = "LONGTEXT") private String payload;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 15) private Status status = Status.PENDING;
     @Column(nullable = false) private int attempts;
     @Column(name = "next_attempt_at", nullable = false) private LocalDateTime nextAttemptAt;

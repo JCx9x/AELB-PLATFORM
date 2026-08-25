@@ -12,6 +12,8 @@ import es.aelb.backendweb.infrastructure.storage.PresignedUrlService;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateChampionshipRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateChampionshipRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.ChampionshipResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -46,17 +48,15 @@ public class ChampionshipController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ChampionshipResponse>> findVisible() {
-        return ResponseEntity.ok(championshipRepository.findVisible().stream()
-                .map(this::toResponse)
-                .toList());
+    public ResponseEntity<PagedResponse<ChampionshipResponse>> findVisible(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(championshipRepository.findPage(pagination.page(), pagination.size(), true), this::toResponse));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<List<ChampionshipResponse>> findAll() {
-        return ResponseEntity.ok(championshipRepository.findAll().stream()
-                .map(this::toResponse)
-                .toList());
+    public ResponseEntity<PagedResponse<ChampionshipResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(championshipRepository.findPage(pagination.page(), pagination.size(), false), this::toResponse));
     }
 
     @GetMapping("/{id}")

@@ -25,7 +25,9 @@ Navegador
 | Base de datos | MySQL 8.4 | Usuarios, campeonatos, inscripciones, cuotas y contenidos. |
 | Almacenamiento | MinIO en desarrollo / S3 en producción | Imágenes, documentos y PDFs en bucket privado; acceso mediante URLs firmadas o API autorizada. |
 
-La orquestación local está en [docker-compose.yml](../docker-compose.yml). Las variables necesarias están en `.env` y no deben incluirse en repositorios públicos.
+La orquestación local está en [docker-compose.yml](../docker-compose.yml). Antes de levantarla, copia `.env.example` a `.env` y cambia las credenciales locales. Las variables necesarias no deben incluirse en repositorios públicos.
+
+Producción utiliza exclusivamente [docker-compose.prod.yml](../docker-compose.prod.yml). Ese fichero activa `SPRING_PROFILES_ACTIVE=prod`, fuerza cookies seguras, utiliza IAM para S3 y no levanta ni publica MySQL, MinIO o Mailpit. Copia `.env.prod.example` a `.env.prod` y sustituye sus placeholders mediante Secrets Manager/Parameter Store cuando sea posible.
 
 ## Frontend: situación actual
 

@@ -5,6 +5,8 @@ import es.aelb.backendweb.domain.document.DocumentRepository;
 import es.aelb.backendweb.domain.document.valueobject.DocumentId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.DocumentJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringDocumentJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -46,6 +48,11 @@ public class JpaDocumentRepositoryAdapter implements DocumentRepository {
         return jpaRepository.findByPublishedTrueOrderByPublishedAtDesc().stream()
                 .map(DocumentJpaMapper::toDomain)
                 .toList();
+    }
+
+    @Override public PageResult<Document> findPage(int page, int size, boolean publishedOnly) {
+        var result = publishedOnly ? jpaRepository.findByPublishedTrueOrderByPublishedAtDesc(PageRequest.of(page, size)) : jpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(DocumentJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

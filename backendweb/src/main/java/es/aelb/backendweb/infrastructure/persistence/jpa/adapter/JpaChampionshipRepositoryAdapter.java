@@ -5,6 +5,8 @@ import es.aelb.backendweb.domain.championship.ChampionshipRepository;
 import es.aelb.backendweb.domain.championship.valueobject.ChampionshipId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.ChampionshipJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringChampionshipJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -42,6 +44,11 @@ public class JpaChampionshipRepositoryAdapter implements ChampionshipRepository 
     @Override
     public List<Championship> findVisible() {
         return jpaRepository.findByVisibleTrue().stream().map(ChampionshipJpaMapper::toDomain).toList();
+    }
+
+    @Override public PageResult<Championship> findPage(int page, int size, boolean visibleOnly) {
+        var result = visibleOnly ? jpaRepository.findByVisibleTrue(PageRequest.of(page, size)) : jpaRepository.findAll(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(ChampionshipJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

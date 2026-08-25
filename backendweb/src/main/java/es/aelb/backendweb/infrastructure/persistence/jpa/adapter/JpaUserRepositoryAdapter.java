@@ -7,6 +7,9 @@ import es.aelb.backendweb.domain.user.valueobject.Email;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.UserJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringUserJpaRepository;
+import es.aelb.backendweb.infrastructure.persistence.jpa.entity.UserJpaEntity;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -59,6 +62,17 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     @Override
     public List<User> findAll() {
         return jpaRepository.findAll().stream().map(UserJpaMapper::toDomain).toList();
+    }
+
+    @Override public PageResult<User> findPage(int page, int size) {
+        var result = jpaRepository.findAll(PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(UserJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override public PageResult<User> findPage(int page, int size, String search, String role) {
+        var roleValue = role == null || role.isBlank() ? null : UserJpaEntity.RoleJpa.valueOf(role.toUpperCase());
+        var result = jpaRepository.findPageBySearchAndRole(search == null ? "" : search.trim(), roleValue, PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(UserJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override

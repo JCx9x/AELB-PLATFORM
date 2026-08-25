@@ -12,6 +12,8 @@ import es.aelb.backendweb.domain.category.valueobject.CategoryId;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateCategoryRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateCategoryRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.CategoryResponse;
+import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
+import es.aelb.backendweb.infrastructure.web.Pagination;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,11 +44,9 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> findAll() {
-        List<CategoryResponse> list = categoryRepository.findAll().stream()
-                .map(CategoryResponse::from)
-                .toList();
-        return ResponseEntity.ok(list);
+    public ResponseEntity<PagedResponse<CategoryResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        Pagination pagination = Pagination.of(page, size);
+        return ResponseEntity.ok(PagedResponse.from(categoryRepository.findPage(pagination.page(), pagination.size()), CategoryResponse::from));
     }
 
     @GetMapping("/age-categories")

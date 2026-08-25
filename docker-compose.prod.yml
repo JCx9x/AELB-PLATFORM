@@ -1,0 +1,68 @@
+name: aelb-prod
+
+# Producción utiliza servicios gestionados/existentes para MySQL y S3.
+# Este fichero no levanta MySQL, MinIO ni Mailpit y no publica el backend.
+networks:
+  aelb-prod-net:
+    driver: bridge
+
+services:
+  backend:
+    build:
+      context: ./backendweb
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_ENV: prod
+      APP_VERSION: ${APP_VERSION:?APP_VERSION is required}
+      GIT_COMMIT: ${GIT_COMMIT:?GIT_COMMIT is required}
+      LOG_LEVEL_ROOT: ${LOG_LEVEL_ROOT:-INFO}
+      DB_HOST: ${DB_HOST:?DB_HOST is required}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Strict}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:?STORAGE_BUCKET is required}
+      STORAGE_REGION: ${STORAGE_REGION:?STORAGE_REGION is required}
+      STORAGE_USE_IAM: "true"
+      STORAGE_ENDPOINT_OVERRIDE: ""
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:?STORAGE_PUBLIC_ENDPOINT is required}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY is required}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET is required}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-eur}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:?STRIPE_SUCCESS_URL is required}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:?STRIPE_CANCEL_URL is required}
+      EMAIL_PROVIDER: ses
+      EMAIL_WORKER_ENABLED: ${EMAIL_WORKER_ENABLED:-true}
+      EMAIL_MAX_PER_SECOND: ${EMAIL_MAX_PER_SECOND:-2}
+      EMAIL_WORKER_CONCURRENCY: ${EMAIL_WORKER_CONCURRENCY:-1}
+      EMAIL_BATCH_SIZE: ${EMAIL_BATCH_SIZE:-10}
+      EMAIL_MAX_RETRIES: ${EMAIL_MAX_RETRIES:-5}
+      EMAIL_FROM: ${EMAIL_FROM:?EMAIL_FROM is required}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:?EMAIL_FROM_NAME is required}
+      AWS_REGION: ${AWS_REGION:?AWS_REGION is required}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:?FRONTEND_PUBLIC_URL is required}
+      EMAIL_TOKEN_ENCRYPTION_KEY: ${EMAIL_TOKEN_ENCRYPTION_KEY:?EMAIL_TOKEN_ENCRYPTION_KEY is required}
+    expose:
+      - "8080"
+    networks:
+      - aelb-prod-net
+
+  frontend:
+    build:
+      context: ./aelb-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - aelb-prod-net

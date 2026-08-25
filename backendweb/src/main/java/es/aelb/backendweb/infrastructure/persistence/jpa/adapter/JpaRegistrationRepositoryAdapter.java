@@ -6,6 +6,8 @@ import es.aelb.backendweb.domain.registration.RegistrationRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.infrastructure.persistence.jpa.mapper.RegistrationJpaMapper;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringRegistrationJpaRepository;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -51,6 +53,16 @@ public class JpaRegistrationRepositoryAdapter implements RegistrationRepository 
     public List<Registration> findByUser(UserId userId) {
         return jpaRepository.findByUserId(userId.value())
                 .stream().map(RegistrationJpaMapper::toDomain).toList();
+    }
+
+    @Override public PageResult<Registration> findPageByChampionship(ChampionshipId championshipId, int page, int size) {
+        var result = jpaRepository.findByChampionshipIdOrderByCreatedAtDesc(championshipId.value(), PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(RegistrationJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override public PageResult<Registration> findPageByUser(UserId userId, int page, int size) {
+        var result = jpaRepository.findByUserIdOrderByCreatedAtDesc(userId.value(), PageRequest.of(page, size));
+        return new PageResult<>(result.getContent().stream().map(RegistrationJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     @Override
