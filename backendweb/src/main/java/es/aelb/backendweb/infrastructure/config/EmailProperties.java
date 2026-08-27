@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "aelb.email")
 public class EmailProperties {
+    private boolean enabled = true;
     private String provider = "smtp";
     private String appEnv = "local";
     private String from = "noreply@localhost.test";
@@ -16,7 +17,7 @@ public class EmailProperties {
     private int processingTimeoutMinutes = 10;
     private int sentRetentionDays = 30;
     private String frontendPublicUrl = "http://localhost:3000";
-    private String awsRegion = "eu-west-1";
+    private String awsRegion = "eu-south-2";
     private String smtpHost = "localhost";
     private int smtpPort = 1025;
     private boolean smtpAuth;
@@ -29,6 +30,7 @@ public class EmailProperties {
     private int emailVerificationMaxPerHour = 5;
     private String tokenEncryptionKey = "";
 
+    public boolean isEnabled() { return enabled; } public void setEnabled(boolean v) { enabled = v; }
     public String getProvider() { return provider; } public void setProvider(String v) { provider = v; }
     public String getAppEnv() { return appEnv; } public void setAppEnv(String v) { appEnv = v; }
     public String getFrom() { return from; } public void setFrom(String v) { from = v; }

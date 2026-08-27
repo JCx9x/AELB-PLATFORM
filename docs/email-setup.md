@@ -29,7 +29,7 @@ APP_ENV=prod
 EMAIL_PROVIDER=ses
 EMAIL_FROM=noreply@midominio.es
 EMAIL_FROM_NAME=AELB
-AWS_REGION=eu-west-1
+AWS_REGION=eu-south-2
 EMAIL_MAX_PER_SECOND=2
 EMAIL_WORKER_CONCURRENCY=1
 EMAIL_BATCH_SIZE=10
@@ -49,7 +49,7 @@ Permiso mínimo recomendado para el role:
   "Statement": [{
     "Effect": "Allow",
     "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-    "Resource": "arn:aws:ses:eu-west-1:123456789012:identity/midominio.es"
+    "Resource": "arn:aws:ses:eu-south-2:123456789012:identity/midominio.es"
   }]
 }
 ```

@@ -1,0 +1,16 @@
+variable "project_name" { type = string }
+variable "environment" { type = string }
+variable "aws_region" { type = string }
+variable "subnet_id" { type = string }
+variable "security_group_id" { type = string }
+variable "instance_profile_name" { type = string }
+variable "instance_type" { type = string }
+variable "root_volume_size" { type = number }
+variable "mysql_volume_size" { type = number }
+variable "enable_eip" { type = bool }
+variable "domain_name" { type = string }
+variable "files_bucket_name" { type = string }
+variable "backups_bucket_name" { type = string }
+variable "backend_repository_url" { type = string }
+variable "frontend_repository_url" { type = string }
+variable "parameter_prefix" { type = string }

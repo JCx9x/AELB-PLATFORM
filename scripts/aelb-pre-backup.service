@@ -1,0 +1,9 @@
+[Unit]
+Description=AELB PRE MySQL backup to S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/aelb/config/pre.env
+ExecStart=/opt/aelb/backup-mysql-pre.sh
