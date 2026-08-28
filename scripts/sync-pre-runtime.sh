@@ -57,7 +57,7 @@ commands=(
   "install -d -m 0750 /opt/aelb /opt/aelb/database /opt/aelb/config"
   "$(write_file_command docker-compose.pre.yml /opt/aelb/docker-compose.pre.yml 0640)"
   "$(write_file_command Caddyfile.pre /opt/aelb/Caddyfile.pre 0640)"
-  "$(write_file_command database/schema.sql /opt/aelb/database/schema.sql 0640)"
+  "$(write_file_command database/schema.sql /opt/aelb/database/schema.sql 0644)"
   "$(write_file_command scripts/backup-mysql-pre.sh /opt/aelb/backup-mysql-pre.sh 0750)"
   "$(write_file_command scripts/aelb-pre-backup.service /etc/systemd/system/aelb-pre-backup.service 0644)"
   "$(write_file_command scripts/aelb-pre-backup.timer /etc/systemd/system/aelb-pre-backup.timer 0644)"

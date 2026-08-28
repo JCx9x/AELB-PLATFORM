@@ -22,6 +22,14 @@ set +a
 command -v aws >/dev/null || { echo "Falta AWS CLI" >&2; exit 1; }
 command -v docker >/dev/null || { echo "Falta Docker" >&2; exit 1; }
 command -v findmnt >/dev/null || { echo "Falta findmnt" >&2; exit 1; }
+command -v stat >/dev/null || { echo "Falta stat" >&2; exit 1; }
+
+schema_file=/opt/aelb/database/schema.sql
+schema_mode="$(stat -c '%a' "$schema_file" 2>/dev/null || true)"
+[[ -f "$schema_file" && -r "$schema_file" && "$schema_mode" =~ [0-7]*[4-7]$ ]] || {
+  echo "ABORTADO: $schema_file no existe o no es legible globalmente (se requiere lectura para otros; modo actual: ${schema_mode:-desconocido})" >&2
+  exit 1
+}
 
 mysql_mount=/var/lib/aelb/mysql
 mountpoint -q "$mysql_mount" || { echo "ABORTADO: $mysql_mount no está montado" >&2; exit 1; }
