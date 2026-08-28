@@ -10,6 +10,7 @@ import {
   getUserRegistrations,
   getMyQuotas, createStripeQuotaCheckout,
   logoutUser,
+  resendVerification,
   type UserProfile, type RegistrationItem, type UserQuota,
 } from '../lib/api'
 import { getSession, clearSession, updateSession } from '../lib/auth'
@@ -59,7 +60,6 @@ export default function PerfilPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName,  setLastName]  = useState('')
   const [phone,     setPhone]     = useState('')
-  const [birthDate, setBirthDate] = useState('')
 
   // ── UI state ────────────────────────────────────────────────────────────────
   const [saving,          setSaving]          = useState(false)
@@ -77,6 +77,7 @@ export default function PerfilPage() {
   const [pwdSaving,      setPwdSaving]      = useState(false)
   const [pwdSaved,       setPwdSaved]       = useState(false)
   const [pwdError,       setPwdError]       = useState<string | null>(null)
+  const [verificationCooldown, setVerificationCooldown] = useState(0)
 
   // ── Load profile ─────────────────────────────────────────────────────────
   const loadProfile = useCallback(async () => {
@@ -93,12 +94,11 @@ export default function PerfilPage() {
         getMyQuotas(),
       ])
       setProfile(data)
-      setRegistrations(regs)
+      setRegistrations(regs.items)
       setQuotas(userQuotas)
       setFirstName(data.firstName)
       setLastName(data.lastName)
       setPhone(data.phone ?? '')
-      setBirthDate(formatDate(data.birthDate))
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setLoadError(e.detail ?? t('errorCarga'))
@@ -116,7 +116,6 @@ export default function PerfilPage() {
     ? firstName !== profile.firstName
       || lastName  !== profile.lastName
       || phone     !== (profile.phone ?? '')
-      || birthDate !== formatDate(profile.birthDate)
     : false
 
   // ── Discard ──────────────────────────────────────────────────────────────
@@ -125,7 +124,6 @@ export default function PerfilPage() {
     setFirstName(profile.firstName)
     setLastName(profile.lastName)
     setPhone(profile.phone ?? '')
-    setBirthDate(formatDate(profile.birthDate))
     setSaveError(null)
   }
 
@@ -141,14 +139,12 @@ export default function PerfilPage() {
       const updated = await updateUserProfile(profile.id, {
         firstName,
         lastName,
-        phone:     phone     || null,
-        birthDate: birthDate || null,
+        phone: phone || null,
       })
       setProfile(updated)
       setFirstName(updated.firstName)
       setLastName(updated.lastName)
       setPhone(updated.phone ?? '')
-      setBirthDate(formatDate(updated.birthDate))
 
       updateSession({ firstName: updated.firstName, lastName: updated.lastName })
 
@@ -421,6 +417,11 @@ export default function PerfilPage() {
                       border: '1px solid var(--color-outline-variant)',
                     }}
                   />
+                  {profile && !profile.emailVerified && (
+                    <button type="button" className="mt-2 text-sm underline" disabled={verificationCooldown > 0} onClick={async () => { await resendVerification(); setVerificationCooldown(60); const timer = window.setInterval(() => setVerificationCooldown(v => { if (v <= 1) { window.clearInterval(timer); return 0 } return v - 1 }), 1000) }}>
+                      {verificationCooldown > 0 ? `Reenviar verificación en ${verificationCooldown}s` : 'Reenviar email de verificación'}
+                    </button>
+                  )}
                 </div>
 
                 {/* DNI (read-only) */}
@@ -518,25 +519,22 @@ export default function PerfilPage() {
                   />
                 </div>
 
-                {/* Fecha de nacimiento */}
+                {/* Fecha de nacimiento (solo lectura) */}
                 <div>
-                  <label htmlFor="birthDate"
-                    className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+                  <label className="block text-[11px] font-bold uppercase tracking-widest mb-2"
                     style={{ color: 'var(--color-on-surface)' }}>
                     {t('fechaNacimiento')} <span className="normal-case font-normal tracking-normal text-[10px]"
-                      style={{ color: 'var(--color-outline)' }}>{t('opcional')}</span>
+                      style={{ color: 'var(--color-outline)' }}>{t('soloModificablePorGestor')}</span>
                   </label>
                   <input
-                    id="birthDate"
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    className="w-full px-4 py-3 text-base rounded-[0.25rem] outline-none transition-all
-                      focus:ring-2 focus:ring-[#d32f2f] focus:border-transparent"
+                    type="text"
+                    value={formatDate(profile.birthDate)}
+                    readOnly
+                    className="w-full px-4 py-3 text-base rounded-[0.25rem] cursor-not-allowed"
                     style={{
                       backgroundColor: 'var(--color-surface)',
-                      color: birthDate ? 'var(--color-on-surface)' : 'var(--color-outline)',
-                      border: '1px solid var(--color-outline)',
+                      color: 'var(--color-outline)',
+                      border: '1px solid var(--color-outline-variant)',
                     }}
                   />
                 </div>

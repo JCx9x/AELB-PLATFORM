@@ -51,7 +51,7 @@ export default function AdminDocumentacionPage() {
   function load() {
     setLoading(true)
     getAllDocuments()
-      .then(setDocuments)
+      .then(result => setDocuments(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCargar')))
       .finally(() => setLoading(false))
   }

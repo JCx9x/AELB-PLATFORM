@@ -1,5 +1,13 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
+export interface Paged<T> {
+  items: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AuthResponse {
@@ -14,6 +22,7 @@ export interface ApiError {
   status: number
   title?: string
   detail: string
+  correlationId?: string
 }
 
 export interface RegisterData {
@@ -26,6 +35,7 @@ export interface RegisterData {
   city:        string
   province:    string | null
   nationality: string
+  birthDate:   string
 }
 
 export interface UserProfile {
@@ -41,15 +51,24 @@ export interface UserProfile {
   birthDate:   string | null
   role:        string
   blocked:     boolean
+  emailVerified: boolean
   teamId:      string | null
   createdAt:   string
 }
 
+// Autoedición de perfil — no incluye birthDate: el usuario no puede
+// modificar su fecha de nacimiento, solo GESTOR/ADMIN (ver ManagementUpdateUserData).
 export interface UpdateProfileData {
   firstName: string
   lastName:  string
   phone?:    string | null
-  birthDate?: string | null
+}
+
+export interface ManagementUpdateUserData {
+  firstName: string
+  lastName:  string
+  phone?:    string | null
+  birthDate: string
 }
 
 export interface Category {
@@ -145,9 +164,10 @@ async function parseError(response: Response): Promise<ApiError> {
       status: response.status,
       title:  body.title,
       detail: body.detail ?? body.message ?? 'Error desconocido',
+      correlationId: body.correlationId ?? response.headers.get('X-Correlation-ID') ?? undefined,
     }
   } catch {
-    return { status: response.status, detail: 'Error de red' }
+    return { status: response.status, detail: 'Error de red', correlationId: response.headers.get('X-Correlation-ID') ?? undefined }
   }
 }
 
@@ -157,10 +177,11 @@ async function parseError(response: Response): Promise<ApiError> {
 
 export async function requestUploadUrl(
   folder: string,
-  contentType: string
+  contentType: string,
+  contentLength: number
 ): Promise<{ uploadUrl: string; key: string }> {
   const response = await fetchWithAuth(
-    `/api/storage/presign/upload?folder=${encodeURIComponent(folder)}&contentType=${encodeURIComponent(contentType)}`,
+    `/api/storage/presign/upload?folder=${encodeURIComponent(folder)}&contentType=${encodeURIComponent(contentType)}&contentLength=${contentLength}`,
     { method: 'POST' }
   )
   if (!response.ok) throw await parseError(response)
@@ -193,6 +214,31 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
     throw await parseError(response)
   }
 
+  return response.json()
+}
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const headers = await getCsrfHeaders()
+  const response = await fetch(`${BASE_URL}/api/auth/password/forgot`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ email }) })
+  if (!response.ok) throw await parseError(response)
+  return response.json()
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  const headers = await getCsrfHeaders()
+  const response = await fetch(`${BASE_URL}/api/auth/password/reset`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ token, password }) })
+  if (!response.ok) throw await parseError(response)
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  const headers = await getCsrfHeaders()
+  const response = await fetch(`${BASE_URL}/api/auth/email/verify`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ token }) })
+  if (!response.ok) throw await parseError(response)
+}
+
+export async function resendVerification(): Promise<{ message: string }> {
+  const response = await fetchWithAuth('/api/auth/email/resend-verification', { method: 'POST' })
+  if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
@@ -241,8 +287,8 @@ export async function updateUserProfile(
   return response.json()
 }
 
-export async function getCategories(): Promise<Category[]> {
-  const response = await fetch(`${BASE_URL}/api/categories`)
+export async function getCategories(page = 0, size = 100): Promise<Paged<Category>> {
+  const response = await fetch(`${BASE_URL}/api/categories?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -293,14 +339,14 @@ export interface NewsData {
   published:   boolean
 }
 
-export async function getNews(): Promise<NewsItem[]> {
-  const response = await fetch(`${BASE_URL}/api/news`)
+export async function getNews(page = 0, size = 25): Promise<Paged<NewsItem>> {
+  const response = await fetch(`${BASE_URL}/api/news?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
-export async function getAllNews(): Promise<NewsItem[]> {
-  const response = await fetchWithAuth('/api/news/all')
+export async function getAllNews(page = 0, size = 25): Promise<Paged<NewsItem>> {
+  const response = await fetchWithAuth(`/api/news/all?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -338,14 +384,14 @@ export async function deleteNews(id: string): Promise<void> {
   if (!response.ok) throw await parseError(response)
 }
 
-export async function getChampionships(): Promise<Championship[]> {
-  const response = await fetch(`${BASE_URL}/api/championships`)
+export async function getChampionships(page = 0, size = 25): Promise<Paged<Championship>> {
+  const response = await fetch(`${BASE_URL}/api/championships?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
-export async function getAllChampionships(): Promise<Championship[]> {
-  const response = await fetchWithAuth('/api/championships/all')
+export async function getAllChampionships(page = 0, size = 25): Promise<Paged<Championship>> {
+  const response = await fetchWithAuth(`/api/championships/all?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -404,14 +450,14 @@ export function resultPdfUrl(id: string): string {
   return `${BASE_URL}/api/results/${id}/pdf`
 }
 
-export async function getResults(): Promise<ResultItem[]> {
-  const response = await fetch(`${BASE_URL}/api/results`)
+export async function getResults(page = 0, size = 25): Promise<Paged<ResultItem>> {
+  const response = await fetch(`${BASE_URL}/api/results?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
-export async function getAllResults(): Promise<ResultItem[]> {
-  const response = await fetchWithAuth('/api/results/all')
+export async function getAllResults(page = 0, size = 25): Promise<Paged<ResultItem>> {
+  const response = await fetchWithAuth(`/api/results/all?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -454,8 +500,8 @@ export interface RegistrationItem {
   createdAt:            string
 }
 
-export async function getUserRegistrations(userId: string): Promise<RegistrationItem[]> {
-  const response = await fetchWithAuth(`/api/users/${userId}/registrations`)
+export async function getUserRegistrations(userId: string, page = 0, size = 25): Promise<Paged<RegistrationItem>> {
+  const response = await fetchWithAuth(`/api/users/${userId}/registrations?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -514,8 +560,8 @@ export interface AdminRegistrationItem {
   createdAt:       string
 }
 
-export async function getChampionshipRegistrations(championshipId: string): Promise<AdminRegistrationItem[]> {
-  const response = await fetchWithAuth(`/api/championships/${championshipId}/registrations`)
+export async function getChampionshipRegistrations(championshipId: string, page = 0, size = 25): Promise<Paged<AdminRegistrationItem>> {
+  const response = await fetchWithAuth(`/api/championships/${championshipId}/registrations?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -577,12 +623,12 @@ export async function adminGetUsers(params?: {
   const response = await fetchWithAuth(`/api/users?${q}`)
   if (!response.ok) throw await parseError(response)
 
-  const users: UserProfile[] = await response.json()
+  const body: Paged<UserProfile> = await response.json()
   return {
-    users,
-    total:      Number(response.headers.get('X-Total-Count') ?? users.length),
-    page:       Number(response.headers.get('X-Page')        ?? 0),
-    totalPages: Number(response.headers.get('X-Total-Pages') ?? 1),
+    users:      body.items,
+    total:      body.totalElements,
+    page:       body.page,
+    totalPages: body.totalPages,
   }
 }
 
@@ -590,13 +636,22 @@ export interface AdminUpdateUserData {
   firstName: string
   lastName:  string
   phone?:    string | null
-  birthDate?: string | null
+  birthDate: string
   role?:     string | null
   blocked?:  boolean | null
 }
 
 export async function adminUpdateUser(userId: string, data: AdminUpdateUserData): Promise<UserProfile> {
   const response = await fetchWithAuth(`/api/users/${userId}/admin`, {
+    method: 'PUT',
+    body:   JSON.stringify(data),
+  })
+  if (!response.ok) throw await parseError(response)
+  return response.json()
+}
+
+export async function managementUpdateUser(userId: string, data: ManagementUpdateUserData): Promise<UserProfile> {
+  const response = await fetchWithAuth(`/api/users/${userId}/management`, {
     method: 'PUT',
     body:   JSON.stringify(data),
   })
@@ -653,14 +708,14 @@ export function teamLogoUrl(id: string): string {
   return `${BASE_URL}/api/teams/${id}/logo`
 }
 
-export async function getTeams(): Promise<Team[]> {
-  const response = await fetch(`${BASE_URL}/api/teams`)
+export async function getTeams(page = 0, size = 25): Promise<Paged<Team>> {
+  const response = await fetch(`${BASE_URL}/api/teams?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
-export async function getManagedTeams(): Promise<Team[]> {
-  const response = await fetchWithAuth('/api/teams/admin')
+export async function getManagedTeams(page = 0, size = 25): Promise<Paged<Team>> {
+  const response = await fetchWithAuth(`/api/teams/admin?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -715,14 +770,14 @@ export function documentFileUrl(id: string): string {
   return `${BASE_URL}/api/documents/${id}/file`
 }
 
-export async function getDocuments(): Promise<DocumentItem[]> {
-  const response = await fetch(`${BASE_URL}/api/documents`)
+export async function getDocuments(page = 0, size = 25): Promise<Paged<DocumentItem>> {
+  const response = await fetch(`${BASE_URL}/api/documents?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
 
-export async function getAllDocuments(): Promise<DocumentItem[]> {
-  const response = await fetchWithAuth('/api/documents/all')
+export async function getAllDocuments(page = 0, size = 25): Promise<Paged<DocumentItem>> {
+  const response = await fetchWithAuth(`/api/documents/all?page=${page}&size=${size}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -820,25 +875,35 @@ export async function logoutUser(): Promise<void> {
   if (!response.ok) throw await parseError(response)
 }
 
-let csrfToken: string | null = null
+// El backend usa CsrfTokenRequestAttributeHandler (no el XOR por defecto), así
+// que el valor de la cookie XSRF-TOKEN (no HttpOnly a propósito) es exactamente
+// el que hay que reenviar como cabecera. Se lee del navegador en cada petición
+// en vez de cachear un valor obtenido una vez: si se cachea, cualquier cambio
+// de la cookie fuera de ese momento concreto deja el valor cacheado obsoleto y
+// el login (u otra petición mutante) falla con 403 aunque los datos sean correctos.
+function readCsrfCookie(): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
 
 async function getCsrfHeaders(): Promise<Record<string, string>> {
   if (typeof window === 'undefined') return {}
 
-  if (!csrfToken) {
+  let token = readCsrfCookie()
+  if (!token) {
     const response = await fetch(`${BASE_URL}/api/auth/csrf`, {
       credentials: 'include',
       cache: 'no-store',
     })
     if (!response.ok) throw await parseError(response)
-    const body = await response.json() as { token?: string }
-    if (!body.token) {
+    token = readCsrfCookie()
+    if (!token) {
       throw { status: response.status, detail: 'No se pudo inicializar la protección CSRF' } satisfies ApiError
     }
-    csrfToken = body.token
   }
 
-  return { 'X-XSRF-TOKEN': csrfToken }
+  return { 'X-XSRF-TOKEN': token }
 }
 
 // The access token cookie is short-lived by design (see audit fix #4) — a

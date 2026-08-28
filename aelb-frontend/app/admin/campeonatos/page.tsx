@@ -77,8 +77,8 @@ export default function CampeonatosAdminPage() {
     setLoadError(null)
     try {
       const [champs, cats] = await Promise.all([getAllChampionships(), getCategories()])
-      setChampionships(champs)
-      setCategories(cats)
+      setChampionships(champs.items)
+      setCategories(cats.items)
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setLoadError(e.detail ?? t('errorCargar'))
@@ -144,7 +144,7 @@ export default function CampeonatosAdminPage() {
     setUploading(true)
     setFormError(null)
     try {
-      const { uploadUrl, key } = await requestUploadUrl('championships', file.type)
+      const { uploadUrl, key } = await requestUploadUrl('championships', file.type, file.size)
       await uploadToS3(uploadUrl, file)
       setField('imageKey', key)
       setImagePreview(URL.createObjectURL(file))

@@ -65,7 +65,7 @@ export default function NoticiasAdminPage() {
     setLoading(true)
     setLoadError(null)
     try {
-      setNews(await getAllNews())
+      setNews((await getAllNews()).items)
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setLoadError(e.detail ?? t('errorCargar'))
@@ -113,7 +113,7 @@ export default function NoticiasAdminPage() {
     setUploading(true)
     setFormError(null)
     try {
-      const { uploadUrl, key } = await requestUploadUrl('news', file.type)
+      const { uploadUrl, key } = await requestUploadUrl('news', file.type, file.size)
       await uploadToS3(uploadUrl, file)
       setForm((prev) => ({ ...prev, imageKey: key, removeImage: false }))
       // Show local preview — no round-trip needed

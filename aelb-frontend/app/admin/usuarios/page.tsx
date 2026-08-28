@@ -8,9 +8,11 @@ import { getSession } from '../../lib/auth'
 import {
   adminGetUsers,
   adminUpdateUser,
+  managementUpdateUser,
   adminDeleteUser,
   type UserProfile,
   type AdminUpdateUserData,
+  type ManagementUpdateUserData,
   getUserQuotas,
   markQuotaPaid,
   type UserQuota,
@@ -261,18 +263,32 @@ export default function AdminUsuariosPage() {
       setSaveError(t('errorNombreApellidosObligatorios'))
       return
     }
+    if (!birthDate) {
+      setSaveError(t('errorFechaNacimientoObligatoria'))
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
-      const data: AdminUpdateUserData = {
-        firstName: firstName.trim(),
-        lastName:  lastName.trim(),
-        phone:     phone.trim() || null,
-        birthDate: birthDate || null,
-        role:      myRole === 'ADMIN' ? role : null,
-        blocked,
+      if (myRole === 'ADMIN') {
+        const data: AdminUpdateUserData = {
+          firstName: firstName.trim(),
+          lastName:  lastName.trim(),
+          phone:     phone.trim() || null,
+          birthDate,
+          role,
+          blocked,
+        }
+        await adminUpdateUser(selected!.id, data)
+      } else {
+        const data: ManagementUpdateUserData = {
+          firstName: firstName.trim(),
+          lastName:  lastName.trim(),
+          phone:     phone.trim() || null,
+          birthDate,
+        }
+        await managementUpdateUser(selected!.id, data)
       }
-      await adminUpdateUser(selected!.id, data)
       closeDrawer()
       load()
     } catch (err: unknown) {
@@ -612,6 +628,8 @@ export default function AdminUsuariosPage() {
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
                     disabled={isSelf(selected.id)}
+                    max={new Date().toISOString().substring(0, 10)}
+                    required
                   />
                 </Field>
               </div>
@@ -632,8 +650,8 @@ export default function AdminUsuariosPage() {
                 </Field>
               )}
 
-              {/* Blocked toggle */}
-              <div className="flex items-center justify-between rounded-[0.25rem] border px-4 py-3"
+              {/* Blocked toggle — only ADMIN can change security state */}
+              {myRole === 'ADMIN' && <div className="flex items-center justify-between rounded-[0.25rem] border px-4 py-3"
                 style={{ borderColor: 'var(--color-outline-variant)' }}>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: 'var(--color-on-surface)' }}>
@@ -650,7 +668,7 @@ export default function AdminUsuariosPage() {
                   className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed ${blocked ? 'bg-[#d32f2f]' : 'bg-gray-300'}`}>
                   <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${blocked ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
-              </div>
+              </div>}
             </div>
 
             {/* Footer */}

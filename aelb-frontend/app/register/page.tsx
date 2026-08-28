@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [phone, setPhone]             = useState('')
   const [city, setCity]               = useState('')
   const [province, setProvince]       = useState('')
+  const [birthDate, setBirthDate]     = useState('')
   const [password, setPassword]       = useState('')
   const [confirm, setConfirm]         = useState('')
   const [showPassword, setShowPassword]   = useState(false)
@@ -48,7 +49,7 @@ export default function RegisterPage() {
     try {
       await registerUser({
         email, password, firstName, lastName, dni, phone,
-        city, province: province.trim() || null, nationality,
+        city, province: province.trim() || null, nationality, birthDate,
       })
       // Auto-login tras registro exitoso
       const auth = await loginUser(email, password)
@@ -196,6 +197,13 @@ export default function RegisterPage() {
                     placeholder={t('placeholderProvincia')} value={province} onChange={(e) => setProvince(e.target.value)} />
                 </Field>
               </div>
+
+              {/* Fecha de nacimiento */}
+              <Field label={t('campoFechaNacimiento')} htmlFor="birthDate">
+                <TextInput id="birthDate" type="date" autoComplete="bday" required
+                  max={new Date().toISOString().substring(0, 10)}
+                  value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+              </Field>
 
               {/* Password */}
               <Field label={t('campoContrasena')} htmlFor="reg-password">

@@ -77,7 +77,7 @@ export default function ChampionshipDetailClient() {
     Promise.all([getChampionship(id), getCategories()])
       .then(([ch, cats]) => {
         setChampionship(ch)
-        setAllCategories(cats)
+        setAllCategories(cats.items)
       })
       .catch((err: { detail?: string }) => {
         setError(err.detail ?? t('errorCarga'))
@@ -97,7 +97,7 @@ export default function ChampionshipDetailClient() {
   useEffect(() => {
     if (!session) return
     getUserRegistrations(session.userId)
-      .then(regs => setMyRegistrations(regs.filter(r => r.championshipId === id)))
+      .then(regs => setMyRegistrations(regs.items.filter(r => r.championshipId === id)))
       .catch(() => {}) // Silencioso: el usuario simplemente ve sin inscripciones
   }, [id, session])
 
