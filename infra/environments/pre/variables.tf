@@ -62,9 +62,15 @@ variable "github_repository" {
   type    = string
   default = "JCx9x/AELB-PLATFORM"
 }
-variable "github_branch" {
+variable "github_environment" {
   type    = string
   default = "pre"
+}
+
+variable "github_branch" {
+  type        = string
+  default     = "pre"
+  description = "Deprecated compatibility variable; OIDC trust is restricted to github_environment."
 }
 variable "ses_identity_arn" {
   type        = string

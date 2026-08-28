@@ -14,5 +14,5 @@ billing_alert_email = ""
 budget_limit_usd = 20
 enable_github_oidc = false
 github_repository = "JCx9x/AELB-PLATFORM"
-github_branch = "pre"
+github_environment = "pre"
 ses_identity_arn = ""

@@ -28,7 +28,7 @@ module "iam" {
   parameter_prefix        = var.parameter_prefix
   enable_github_oidc      = var.enable_github_oidc
   github_repository       = var.github_repository
-  github_branch           = var.github_branch
+  github_environment      = var.github_environment
   ses_identity_arn        = var.ses_identity_arn
 }
 
@@ -73,7 +73,7 @@ resource "aws_iam_role_policy" "github_ssm_deploy" {
       {
         Sid      = "ReadCommandResult"
         Effect   = "Allow"
-        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"]
+        Action   = ["ssm:GetCommandInvocation", "ssm:ListCommands", "ssm:ListCommandInvocations"]
         Resource = "*"
       }
     ]

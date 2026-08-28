@@ -8,5 +8,5 @@ variable "frontend_repository_arn" { type = string }
 variable "parameter_prefix" { type = string }
 variable "enable_github_oidc" { type = bool }
 variable "github_repository" { type = string }
-variable "github_branch" { type = string }
+variable "github_environment" { type = string }
 variable "ses_identity_arn" { type = string }

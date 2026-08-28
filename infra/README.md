@@ -127,7 +127,7 @@ El rol incluye `AmazonSSMManagedInstanceCore`, que contiene algunos recursos `*`
 
 ## CI/CD futuro
 
-El módulo IAM puede crear, con `enable_github_oidc = true`, un proveedor OIDC y un rol restringido a `github_repository` y `github_branch`. Ese rol tiene push sobre los dos ECR y, mediante una policy del entorno, `ssm:SendCommand` solo al documento `AWS-RunShellScript` y a la instancia PRE. El despliegue seguirá separado de Terraform: GitHub Actions ejecutará tests, build ARM64, push ECR y el comando SSM. No se guardan AWS access keys permanentes. Si la cuenta ya tiene el proveedor GitHub OIDC, revisa antes de activar la variable para no duplicarlo.
+El módulo IAM puede crear, con `enable_github_oidc = true`, un proveedor OIDC y un rol restringido a `github_repository` y al GitHub Environment `github_environment`. Ese rol tiene push sobre los dos ECR y, mediante una policy del entorno, `ssm:SendCommand` solo al documento `AWS-RunShellScript` y a la instancia PRE. El despliegue seguirá separado de Terraform: GitHub Actions ejecutará tests, build ARM64, push ECR y el comando SSM. No se guardan AWS access keys permanentes. Si la cuenta ya tiene el proveedor GitHub OIDC, revisa antes de activar la variable para no duplicarlo.
 
 ## Destrucción y persistencia
 
