@@ -1,4 +1,17 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+/**
+ * The endpoint paths below include the /api prefix. Accept both a host-only
+ * base URL and legacy values that already end in /api without duplicating it.
+ */
+export function normalizeBaseUrl(baseUrl: string): string {
+  const withoutTrailingSlashes = baseUrl.replace(/\/+$/, '')
+  return withoutTrailingSlashes.endsWith('/api')
+    ? withoutTrailingSlashes.slice(0, -'/api'.length)
+    : withoutTrailingSlashes
+}
+
+const BASE_URL = normalizeBaseUrl(
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
+)
 
 export interface Paged<T> {
   items: T[]
