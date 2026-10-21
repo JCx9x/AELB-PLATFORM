@@ -9,7 +9,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Mailpit queda disponible en [http://localhost:8025](http://localhost:8025) y SMTP en `localhost:1025` desde el host (`mailpit:1025` desde el contenedor backend). El profile local fuerza SMTP y el backend rechaza SES fuera de producción.
+Mailpit queda disponible en [http://localhost:8025](http://localhost:8025) y SMTP en `localhost:1025` desde el host (`mailpit:1025` desde el contenedor backend). El profile local fuerza SMTP; SES solo se admite explícitamente en PRE/producción.
 
 Flujos verificables: registro y verificación, `/forgot-password`, `/reset-password`, inscripción y webhook Stripe en test mode. Ninguno necesita credenciales AWS ni envía correos reales.
 
@@ -27,9 +27,12 @@ Variables relevantes:
 ```env
 APP_ENV=prod
 EMAIL_PROVIDER=ses
+EMAIL_ENABLED=true
+EMAIL_SES_REGION=eu-south-1
 EMAIL_FROM=noreply@midominio.es
 EMAIL_FROM_NAME=AELB
-AWS_REGION=eu-west-1
+AWS_REGION=eu-south-2
+EMAIL_SES_REGION=eu-south-1
 EMAIL_MAX_PER_SECOND=2
 EMAIL_WORKER_CONCURRENCY=1
 EMAIL_BATCH_SIZE=10
@@ -48,8 +51,8 @@ Permiso mínimo recomendado para el role:
   "Version": "2012-10-17",
   "Statement": [{
     "Effect": "Allow",
-    "Action": ["ses:SendEmail", "ses:SendRawEmail"],
-    "Resource": "arn:aws:ses:eu-west-1:123456789012:identity/midominio.es"
+    "Action": ["ses:SendEmail"],
+    "Resource": "arn:aws:ses:eu-south-1:123456789012:identity/midominio.es"
   }]
 }
 ```

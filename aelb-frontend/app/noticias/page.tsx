@@ -18,7 +18,7 @@ export default function NoticiasPage() {
 
   useEffect(() => {
     getNews()
-      .then(setNews)
+      .then(result => setNews(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
   }, [t])

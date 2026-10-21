@@ -1,0 +1,4 @@
+bucket = "REPLACE_WITH_BOOTSTRAP_OUTPUT"
+key = "aelb/pre/terraform.tfstate"
+region = "eu-south-2"
+use_lockfile = true

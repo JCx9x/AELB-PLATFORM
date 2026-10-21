@@ -28,6 +28,7 @@ public class StripeWebhookController {
 
     @PostMapping
     public ResponseEntity<Void> receive(@RequestBody String payload, @RequestHeader(value = "Stripe-Signature", required = false) String signature) {
+        if (!verifier.isEnabled()) return ResponseEntity.notFound().build();
         long started = System.nanoTime();
         if (!verifier.isValid(payload, signature)) {
             metrics.stripeWebhook("signature_invalid");

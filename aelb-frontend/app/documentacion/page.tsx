@@ -17,7 +17,7 @@ export default function DocumentacionPage() {
 
   useEffect(() => {
     getDocuments()
-      .then(setDocuments)
+      .then(result => setDocuments(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
   }, [t])

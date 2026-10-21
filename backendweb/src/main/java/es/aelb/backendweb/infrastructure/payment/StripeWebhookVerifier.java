@@ -13,8 +13,10 @@ public class StripeWebhookVerifier {
     private final StripeProperties properties;
     public StripeWebhookVerifier(StripeProperties properties) { this.properties = properties; }
 
+    public boolean isEnabled() { return properties.isWebhookEnabled(); }
+
     public boolean isValid(String payload, String signatureHeader) {
-        if (properties.getWebhookSecret() == null || properties.getWebhookSecret().isBlank() || signatureHeader == null) return false;
+        if (!properties.isWebhookEnabled() || properties.getWebhookSecret() == null || properties.getWebhookSecret().isBlank() || signatureHeader == null) return false;
         String timestamp = null;
         for (String part : signatureHeader.split(",")) if (part.startsWith("t=")) timestamp = part.substring(2);
         if (timestamp == null) return false;

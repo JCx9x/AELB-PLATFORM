@@ -10,6 +10,17 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 
 class EmailWorkerTest {
+    @Test void emailDeshabilitadoNoReclamaNiEnvía() {
+        EmailProperties p = properties(); p.setEnabled(false); p.setWorkerEnabled(false);
+        EmailSender sender = mock(EmailSender.class);
+        EmailOutboxTransactionService tx = mock(EmailOutboxTransactionService.class);
+
+        new EmailWorker(sender, new EmailPayloadCrypto(p), p, new ObjectMapper(), new EmailRateLimiter(p), tx, Runnable::run).tick();
+
+        verify(tx, never()).claim();
+        verifyNoInteractions(sender);
+    }
+
     @Test void emailEnviadoPasaACompletado() throws Exception {
         EmailProperties p = properties();
         EmailPayloadCrypto crypto = new EmailPayloadCrypto(p);

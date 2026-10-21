@@ -53,7 +53,7 @@ export default function AdminResultadosPage() {
   function load() {
     setLoading(true)
     getAllResults()
-      .then(setResults)
+      .then(result => setResults(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCargar')))
       .finally(() => setLoading(false))
   }

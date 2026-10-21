@@ -26,8 +26,8 @@ export default function HomePage() {
   useEffect(() => {
     Promise.all([getChampionships(), getNews()])
       .then(([champs, items]) => {
-        setChampionships(champs)
-        setNews(items)
+        setChampionships(champs.items)
+        setNews(items.items)
       })
       .catch(() => {/* silent — sections simply stay empty */})
       .finally(() => setLoading(false))

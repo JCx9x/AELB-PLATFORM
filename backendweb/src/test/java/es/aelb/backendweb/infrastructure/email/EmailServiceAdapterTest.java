@@ -12,6 +12,43 @@ import java.util.Optional;
 import static org.mockito.Mockito.*;
 
 class EmailServiceAdapterTest {
+    @Test void emailDeshabilitadoNoEncolaVerificacion() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(UserId.of("u1"));
+        when(user.getEmail()).thenReturn(Email.of("user@example.com"));
+        EmailProperties p = new EmailProperties(); p.setEnabled(false);
+        SpringEmailOutboxJpaRepository outbox = mock(SpringEmailOutboxJpaRepository.class);
+        SpringEmailVerificationTokenJpaRepository verifications = mock(SpringEmailVerificationTokenJpaRepository.class);
+
+        EmailServiceAdapter service = new EmailServiceAdapter(
+                new UserRepositoryAdapterStub(user), outbox, mock(SpringPasswordResetTokenJpaRepository.class),
+                verifications, p, new EmailPayloadCrypto(p), new ObjectMapper(), mock(SpringUserJpaRepository.class));
+        service.requestEmailVerification(user);
+
+        verifyNoInteractions(outbox, verifications);
+    }
+
+    @Test void emailHabilitadoEncolaVerificacion() {
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(UserId.of("u1"));
+        when(user.getEmail()).thenReturn(Email.of("user@example.com"));
+        when(user.getFirstName()).thenReturn("Test");
+        when(user.isEmailVerified()).thenReturn(false);
+
+        SpringEmailVerificationTokenJpaRepository verifications = mock(SpringEmailVerificationTokenJpaRepository.class);
+        when(verifications.existsByUserIdAndCreatedAtAfter(anyString(), any())).thenReturn(false);
+        when(verifications.countByUserIdAndCreatedAtAfter(anyString(), any())).thenReturn(0L);
+        SpringEmailOutboxJpaRepository outbox = mock(SpringEmailOutboxJpaRepository.class);
+        EmailProperties p = new EmailProperties(); p.setEnabled(true); p.setTokenEncryptionKey("test");
+
+        EmailServiceAdapter service = new EmailServiceAdapter(
+                new UserRepositoryAdapterStub(user), outbox, mock(SpringPasswordResetTokenJpaRepository.class),
+                verifications, p, new EmailPayloadCrypto(p), new ObjectMapper(), mock(SpringUserJpaRepository.class));
+        service.requestEmailVerification(user);
+
+        verify(outbox).insertIgnore(anyString(), eq("EMAIL_VERIFICATION"), eq("user@example.com"), anyString(), any(), contains("EMAIL_VERIFICATION:u1:"));
+    }
+
     @Test void segundoForgotDuranteCooldownNoCreaOtroOutbox() {
         User user = mock(User.class); when(user.getId()).thenReturn(UserId.of("u1")); when(user.getEmail()).thenReturn(Email.of("user@example.com")); when(user.getFirstName()).thenReturn("Test");
         UserRepositoryAdapterStub users = new UserRepositoryAdapterStub(user);

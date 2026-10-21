@@ -2,3 +2,14 @@
 .env.local
 .env.*.local
 !.env.example
+
+# Runtime configuration generated only on the PRE EC2 instance.
+config/*.env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
+backend.hcl

@@ -1,0 +1,95 @@
+name: aelb-pre
+
+networks:
+  aelb-pre-net:
+    driver: bridge
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80"]
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-:80}
+    volumes:
+      - ./Caddyfile.pre:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [aelb-pre-net]
+    mem_limit: 128m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file: [./config/pre.env]
+    command: >-
+      --innodb-buffer-pool-size=512M --max-connections=40
+      --performance-schema=OFF --table-open-cache=400
+    volumes:
+      - /var/lib/aelb/mysql:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks: [aelb-pre-net]
+    mem_limit: 700m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
+    restart: unless-stopped
+    env_file: [./config/pre.env]
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      SPRING_PROFILES_ACTIVE: prod
+      APP_ENV: pre
+      AWS_REGION: ${AWS_REGION:-eu-south-2}
+      STORAGE_USE_IAM: "true"
+      STORAGE_ENDPOINT_OVERRIDE: ""
+      STORAGE_PUBLIC_ENDPOINT: ""
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/aelb_db?sslMode=REQUIRED&serverTimezone=UTC
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx384m -XX:+UseSerialGC"
+    depends_on:
+      mysql: { condition: service_healthy }
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health/liveness | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks: [aelb-pre-net]
+    mem_limit: 512m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
+    restart: unless-stopped
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [aelb-pre-net]
+    mem_limit: 384m
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,4 @@
+'use client'
+import { Suspense, useEffect,useState } from 'react'; import { useSearchParams } from 'next/navigation'; import Link from 'next/link'; import { verifyEmail } from '../lib/api'
+function VerifyContent(){const token=useSearchParams().get('token')??'';const [state,setState]=useState<'loading'|'ok'|'error'>('loading');useEffect(()=>{verifyEmail(token).then(()=>setState('ok')).catch(()=>setState('error'))},[token]);return <main className="mx-auto max-w-md p-8"><h1 className="text-2xl font-bold mb-6">Verificación de email</h1>{state==='loading'&&<p>Verificando…</p>}{state==='ok'&&<><p>Email verificado correctamente.</p><Link className="mt-6 block underline" href="/login">Iniciar sesión</Link></>}{state==='error'&&<p className="text-red-600">El enlace no es válido o ha expirado.</p>}</main>}
+export default function VerifyEmailPage(){return <Suspense fallback={<main className="p-8">Verificando…</main>}><VerifyContent/></Suspense>}

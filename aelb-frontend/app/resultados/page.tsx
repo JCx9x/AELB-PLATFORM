@@ -17,7 +17,7 @@ export default function ResultadosPage() {
 
   useEffect(() => {
     getResults()
-      .then(setResults)
+      .then(result => setResults(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
   }, [t])

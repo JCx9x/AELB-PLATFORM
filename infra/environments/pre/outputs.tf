@@ -1,0 +1,14 @@
+output "instance_id" { value = module.compute.instance_id }
+output "public_ip" { value = module.compute.public_ip }
+output "public_dns" { value = module.compute.public_dns }
+output "vpc_id" { value = module.network.vpc_id }
+output "public_subnet_id" { value = module.network.public_subnet_id }
+output "security_group_id" { value = module.network.security_group_id }
+output "files_bucket" { value = module.storage.files_bucket_name }
+output "backups_bucket" { value = module.storage.backups_bucket_name }
+output "backend_repository_url" { value = module.storage.backend_repository_url }
+output "frontend_repository_url" { value = module.storage.frontend_repository_url }
+output "parameter_store_prefix" { value = var.parameter_prefix }
+output "mysql_volume_id" { value = module.compute.mysql_volume_id }
+output "session_manager_command" { value = "aws ssm start-session --target ${module.compute.instance_id} --region ${var.aws_region}" }
+output "github_deploy_role_arn" { value = module.iam.github_deploy_role_arn }

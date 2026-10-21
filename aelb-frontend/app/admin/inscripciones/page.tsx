@@ -43,6 +43,9 @@ export default function InscripcionesAdminPage() {
   const [championships,  setChampionships]  = useState<Championship[]>([])
   const [selectedId,     setSelectedId]     = useState<string>('')
   const [registrations,  setRegistrations]  = useState<AdminRegistrationItem[]>([])
+  const [registrationPage, setRegistrationPage] = useState(0)
+  const [registrationTotalPages, setRegistrationTotalPages] = useState(0)
+  const [registrationTotal, setRegistrationTotal] = useState(0)
   const [categories,     setCategories]     = useState<Category[]>([])
   const [loadingCh,      setLoadingCh]      = useState(true)
   const [loadingRegs,    setLoadingRegs]    = useState(false)
@@ -62,21 +65,24 @@ export default function InscripcionesAdminPage() {
     setLoadingCh(true)
     getAllChampionships()
       .then(champs => {
-        setChampionships(champs)
-        if (champs.length > 0) setSelectedId(champs[0].id)
+        setChampionships(champs.items)
+        if (champs.items.length > 0) setSelectedId(champs.items[0].id)
       })
       .catch((err: { detail?: string }) => setLoadError(err.detail ?? t('errorCargarCampeonatos')))
       .finally(() => setLoadingCh(false))
-    getCategories().then(setCategories).catch(() => {})
+    getCategories().then(result => setCategories(result.items)).catch(() => {})
   }, [t])
 
-  const loadRegistrations = useCallback(async (championshipId: string) => {
+  const loadRegistrations = useCallback(async (championshipId: string, page = 0) => {
     if (!championshipId) return
     setLoadingRegs(true)
     setActionError(null)
     try {
-      const regs = await getChampionshipRegistrations(championshipId)
-      setRegistrations(regs)
+      const regs = await getChampionshipRegistrations(championshipId, page, 25)
+      setRegistrations(regs.items)
+      setRegistrationPage(regs.page)
+      setRegistrationTotalPages(regs.totalPages)
+      setRegistrationTotal(regs.totalElements)
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setActionError(e.detail ?? t('errorCargarInscripciones'))
@@ -111,7 +117,7 @@ export default function InscripcionesAdminPage() {
     setActionError(null)
     try {
       await changeRegistrationCategory(reg.id, newCategoryId)
-      await loadRegistrations(selectedId)
+      await loadRegistrations(selectedId, registrationPage)
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setActionError(e.detail ?? t('errorCambiarCategoria'))
@@ -208,7 +214,7 @@ export default function InscripcionesAdminPage() {
             {/* Stats bar */}
             {registrations.length > 0 && (
               <div className="flex gap-4 mb-6">
-                <StatChip label={t('statTotal')} value={stats.total} color="var(--color-on-surface-variant)" />
+                <StatChip label={t('statTotal')} value={registrationTotal} color="var(--color-on-surface-variant)" />
                 <StatChip label={t('statPagados')} value={stats.paid} color="#047857" bg="rgba(5,150,105,0.1)" />
                 <StatChip label={t('statPendientes')} value={stats.pending} color="#b45309" bg="rgba(217,119,6,0.1)" />
               </div>
@@ -311,6 +317,13 @@ export default function InscripcionesAdminPage() {
                 </section>
               )
             })}
+            {registrationTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 py-4">
+                <button className="rounded border px-3 py-2 text-sm disabled:opacity-40" disabled={registrationPage === 0} onClick={() => loadRegistrations(selectedId, registrationPage - 1)}>Anterior</button>
+                <span className="text-sm">{registrationPage + 1} / {registrationTotalPages}</span>
+                <button className="rounded border px-3 py-2 text-sm disabled:opacity-40" disabled={registrationPage + 1 >= registrationTotalPages} onClick={() => loadRegistrations(selectedId, registrationPage + 1)}>Siguiente</button>
+              </div>
+            )}
           </>
         )}
       </div>

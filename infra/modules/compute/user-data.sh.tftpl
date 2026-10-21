@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+exec > >(tee -a /var/log/aelb-bootstrap.log | logger -t aelb-bootstrap -s 2>/dev/console) 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y ca-certificates curl unzip jq logrotate
+
+if ! command -v docker >/dev/null 2>&1; then
+  # Docker packages may start the service from their maintainer scripts. Keep
+  # Docker and containerd unavailable until the dedicated data volume is ready.
+  systemctl mask --runtime docker.service docker.socket containerd.service 2>/dev/null || true
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  . /etc/os-release
+  echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $VERSION_CODENAME stable" > /etc/apt/sources.list.d/docker.list
+  apt-get update -y
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+
+# This also covers images where Docker was already installed or was started by
+# package installation before this script reached the storage setup.
+systemctl mask --runtime docker.service docker.socket containerd.service 2>/dev/null || true
+systemctl stop docker.service docker.socket containerd.service 2>/dev/null || true
+
+if ! command -v aws >/dev/null 2>&1; then
+  curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip -o /tmp/awscliv2.zip
+  rm -rf /tmp/aws
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install --update
+  rm -rf /tmp/aws /tmp/awscliv2.zip
+fi
+
+install -d -m 0750 /opt/aelb /opt/aelb/config /opt/aelb/backups /var/lib/aelb/mysql
+
+# The attachment can finish after cloud-init starts. Resolve the exact EBS volume
+# by its Terraform-provided volume ID (NVMe serial on Graviton/Nitro), never by
+# choosing an arbitrary unmounted disk.
+MYSQL_VOLUME_ID="${mysql_volume_id}"
+MYSQL_VOLUME_ID_COMPACT="$${MYSQL_VOLUME_ID//-/}"
+MYSQL_DEVICE=""
+for attempt in $(seq 1 120); do
+  udevadm settle || true
+  while read -r name type serial; do
+    serial="$${serial//-/}"
+    if [ "$${type}" = "disk" ] && [ "$${serial}" = "$${MYSQL_VOLUME_ID_COMPACT}" ]; then
+      MYSQL_DEVICE="/dev/$${name}"
+      break 2
+    fi
+  done < <(lsblk -dnro NAME,TYPE,SERIAL)
+  sleep 5
+done
+
+if [ -z "$${MYSQL_DEVICE}" ] || [ ! -b "$${MYSQL_DEVICE}" ]; then
+  echo "ERROR: MySQL EBS volume $${MYSQL_VOLUME_ID} did not appear after 10 minutes" >&2
+  exit 1
+fi
+
+mkdir -p /var/lib/aelb/mysql
+MYSQL_FSTYPE="$(blkid -s TYPE -o value "$${MYSQL_DEVICE}" 2>/dev/null || true)"
+if [ -n "$${MYSQL_FSTYPE}" ] && [ "$${MYSQL_FSTYPE}" != "ext4" ]; then
+  echo "ERROR: MySQL EBS has filesystem type $${MYSQL_FSTYPE}; refusing to format" >&2
+  exit 1
+fi
+
+if [ -z "$${MYSQL_FSTYPE}" ]; then
+  # An absent blkid signature is not enough to prove the disk is new. Refuse to
+  # format if wipefs sees any existing filesystem/partition metadata.
+  if [ -n "$(wipefs -n "$${MYSQL_DEVICE}")" ]; then
+    echo "ERROR: MySQL EBS volume has unrecognized existing metadata; refusing mkfs" >&2
+    exit 1
+  fi
+  mkfs.ext4 -F "$${MYSQL_DEVICE}"
+fi
+
+MYSQL_UUID="$(blkid -s UUID -o value "$${MYSQL_DEVICE}")"
+if [ -z "$${MYSQL_UUID}" ]; then
+  echo "ERROR: no filesystem UUID found on MySQL EBS volume $${MYSQL_DEVICE}" >&2
+  exit 1
+fi
+
+if mountpoint -q /var/lib/aelb/mysql; then
+  MYSQL_MOUNT_INFO="$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,FSTYPE,SOURCE 2>/dev/null || true)"
+  if [ -z "$${MYSQL_MOUNT_INFO}" ]; then
+    echo "ERROR: /var/lib/aelb/mysql is a mount point but findmnt could not inspect the exact target" >&2
+    exit 1
+  fi
+  MYSQL_MOUNT_UUID="$(printf '%s\n' "$${MYSQL_MOUNT_INFO}" | awk '{print $1}')"
+  MYSQL_MOUNT_TYPE="$(printf '%s\n' "$${MYSQL_MOUNT_INFO}" | awk '{print $2}')"
+  if [ "$${MYSQL_MOUNT_UUID}" != "$${MYSQL_UUID}" ] || [ "$${MYSQL_MOUNT_TYPE}" != "ext4" ]; then
+    echo "ERROR: /var/lib/aelb/mysql is mounted from the wrong volume or filesystem" >&2
+    exit 1
+  fi
+else
+  MYSQL_PREMOUNT_ENTRY="$(find /var/lib/aelb/mysql -mindepth 1 -maxdepth 1 -print -quit)"
+  if [ -n "$${MYSQL_PREMOUNT_ENTRY}" ]; then
+    echo "ERROR: /var/lib/aelb/mysql contains data before mounting; refusing to hide it" >&2
+    exit 1
+  fi
+fi
+
+# Remove only stale entries for this mountpoint, then install one canonical entry.
+awk '$2 != "/var/lib/aelb/mysql" {print}' /etc/fstab > /etc/fstab.aelb-bootstrap
+cat >> /etc/fstab.aelb-bootstrap <<EOF
+UUID=$${MYSQL_UUID} /var/lib/aelb/mysql ext4 defaults,nofail 0 2
+EOF
+install -m 0644 /etc/fstab.aelb-bootstrap /etc/fstab
+rm -f /etc/fstab.aelb-bootstrap
+
+if ! mountpoint -q /var/lib/aelb/mysql; then
+  mount /var/lib/aelb/mysql
+fi
+
+if ! mountpoint -q /var/lib/aelb/mysql; then
+  echo "ERROR: failed to mount MySQL EBS at /var/lib/aelb/mysql" >&2
+  exit 1
+fi
+
+MYSQL_MOUNT_INFO="$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,FSTYPE,SOURCE 2>/dev/null || true)"
+MYSQL_MOUNT_UUID="$(printf '%s\n' "$${MYSQL_MOUNT_INFO}" | awk '{print $1}')"
+MYSQL_MOUNT_TYPE="$(printf '%s\n' "$${MYSQL_MOUNT_INFO}" | awk '{print $2}')"
+if [ "$${MYSQL_MOUNT_UUID}" != "$${MYSQL_UUID}" ] || [ "$${MYSQL_MOUNT_TYPE}" != "ext4" ]; then
+  echo "ERROR: mounted MySQL EBS does not match expected UUID/filesystem" >&2
+  exit 1
+fi
+
+# On reboots, systemd must mount the EBS before Docker is allowed to start.
+install -d -m 0755 /etc/systemd/system/docker.service.d
+cat >/etc/systemd/system/docker.service.d/aelb-mysql-storage.conf <<'EOF'
+[Unit]
+RequiresMountsFor=/var/lib/aelb/mysql
+EOF
+systemctl daemon-reload
+systemctl unmask docker.service docker.socket containerd.service 2>/dev/null || true
+systemctl daemon-reload
+
+install -d -m 0755 /etc/docker
+if [ ! -f /etc/docker/daemon.json ]; then
+  cat >/etc/docker/daemon.json <<'JSON'
+{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}
+JSON
+fi
+systemctl enable --now docker
+chown -R root:root /opt/aelb /var/lib/aelb
+chmod 0750 /var/lib/aelb/mysql
+
+# Ubuntu images normally ship the SSM agent; enable whichever unit is present.
+systemctl enable --now amazon-ssm-agent 2>/dev/null || systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent 2>/dev/null || true
+systemctl restart systemd-journald || true
+echo "AELB PRE host bootstrap completed at $(date -Is)"

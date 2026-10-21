@@ -78,7 +78,7 @@ export default function CategoriasPage() {
     setLoading(true)
     setLoadError(null)
     try {
-      setCategories(await getCategories())
+      setCategories((await getCategories()).items)
     } catch (err: unknown) {
       const e = err as { detail?: string }
       setLoadError(e.detail ?? t('errorCargar'))

@@ -31,6 +31,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             // enumeración de cuentas probando muchos emails desde la misma IP.
             new RouteLimit("POST", "/api/auth/login", 20, Duration.ofMinutes(1)),
             new RouteLimit("POST", "/api/auth/password/forgot", 5, Duration.ofMinutes(15)),
+            new RouteLimit("POST", "/api/auth/password/reset", 10, Duration.ofMinutes(15)),
             new RouteLimit("POST", "/api/auth/email/resend-verification", 5, Duration.ofMinutes(15)),
             // Alta de cuenta: abuso para crear cuentas basura o tantear emails ya registrados.
             new RouteLimit("POST", "/api/users", 8, Duration.ofHours(1)),

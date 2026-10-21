@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "aelb.stripe")
 public class StripeProperties {
     private String secretKey = "";
+    private boolean webhookEnabled = true;
     private String webhookSecret = "";
     private String currency = "eur";
     private String successUrl = "http://localhost:3000/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}";
@@ -17,6 +18,8 @@ public class StripeProperties {
     private long circuitBreakerOpenMs = 30000;
     public String getSecretKey() { return secretKey; }
     public void setSecretKey(String secretKey) { this.secretKey = secretKey; }
+    public boolean isWebhookEnabled() { return webhookEnabled; }
+    public void setWebhookEnabled(boolean webhookEnabled) { this.webhookEnabled = webhookEnabled; }
     public String getWebhookSecret() { return webhookSecret; }
     public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
     public String getCurrency() { return currency; }

@@ -1,0 +1,12 @@
+variable "project_name" { type = string }
+variable "environment" { type = string }
+variable "aws_region" { type = string }
+variable "files_bucket_arn" { type = string }
+variable "backups_bucket_arn" { type = string }
+variable "backend_repository_arn" { type = string }
+variable "frontend_repository_arn" { type = string }
+variable "parameter_prefix" { type = string }
+variable "enable_github_oidc" { type = bool }
+variable "github_repository" { type = string }
+variable "github_environment" { type = string }
+variable "ses_identity_arn" { type = string }

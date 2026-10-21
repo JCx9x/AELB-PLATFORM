@@ -117,7 +117,7 @@ export default function EquiposPage() {
   function loadTeams() {
     setLoading(true);
     (isManager ? getManagedTeams() : getTeams())
-      .then(setTeams)
+      .then(result => setTeams(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
   }

@@ -22,7 +22,7 @@ export default function CampeonatosPage() {
 
   useEffect(() => {
     getChampionships()
-      .then(setChampionships)
+      .then(result => setChampionships(result.items))
       .catch((err: { detail?: string }) => setError(err.detail ?? t('errorCarga')))
       .finally(() => setLoading(false))
   }, [t])
