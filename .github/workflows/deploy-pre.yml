@@ -141,7 +141,7 @@ jobs:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
           DOCKER_CACHE_FROM: gha
           DOCKER_CACHE_TO: gha
-        run: ./scripts/build-pre.sh
+        run: bash ./scripts/build-pre.sh
 
       - name: Sync PRE runtime through SSM
         id: sync
@@ -152,7 +152,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          command_id="$(./scripts/sync-pre-runtime.sh)"
+          command_id="$(bash ./scripts/sync-pre-runtime.sh)"
           [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]] || {
             echo "Unexpected SSM command id: $command_id" >&2
             exit 1
