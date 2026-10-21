@@ -121,7 +121,7 @@ jobs:
           REQUESTED_TAG: ${{ inputs.image_tag }}
         run: |
           set -Eeuo pipefail
-          tag="${REQUESTED_TAG:-pre-${GITHUB_SHA}}"
+          tag="${REQUESTED_TAG:-pre-${GITHUB_SHA}-${GITHUB_RUN_ID}}"
           [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
             echo 'Invalid image tag' >&2
             exit 1
