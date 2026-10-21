@@ -1,0 +1,250 @@
+name: Deploy PRE
+
+on:
+  push:
+    branches: [pre]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing PRE image tag to redeploy (leave empty to build this commit)"
+        required: false
+        type: string
+
+concurrency:
+  group: aelb-pre-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-south-2
+  AWS_ACCOUNT_ID: "537735703239"
+  ECR_REGISTRY: 537735703239.dkr.ecr.eu-south-2.amazonaws.com
+  INSTANCE_ID: i-073035077dc228e14
+  DOMAIN_NAME: ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
+  PRE_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
+  FILES_BUCKET: aelb-pre-files-537735703239-eu-south-2
+  BACKUPS_BUCKET: aelb-pre-backups-537735703239-eu-south-2
+  AELB_PARAMETER_PREFIX: /aelb/pre/
+  CORS_ALLOWED_ORIGINS: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
+  FRONTEND_PUBLIC_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
+  STRIPE_SUCCESS_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
+  STRIPE_CANCEL_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled
+  STRIPE_WEBHOOK_ENABLED: "false"
+  EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
+  EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
+  EMAIL_PROVIDER: ses
+  EMAIL_FROM: javiercanoramirez@gmail.com
+  EMAIL_FROM_NAME: AELB PRE
+  EMAIL_SES_REGION: eu-south-1
+  APP_VERSION: pre
+
+jobs:
+  deploy:
+    name: Validate, build and deploy PRE
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: pre
+    env:
+      AWS_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Validate required deployment variable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ -n "$AWS_ROLE_ARN" ]] || {
+            echo 'Missing GitHub Environment variable AWS_DEPLOY_ROLE_ARN' >&2
+            exit 1
+          }
+          printf 'Commit: %s\n' "$GITHUB_SHA"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate backend
+        working-directory: backendweb
+        run: ./mvnw -B clean verify
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: aelb-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: aelb-frontend
+        run: npm ci
+
+      - name: Test frontend
+        working-directory: aelb-frontend
+        run: npm test
+
+      - name: Typecheck frontend
+        working-directory: aelb-frontend
+        run: npx tsc --noEmit
+
+      - name: Build frontend validation bundle
+        working-directory: aelb-frontend
+        env:
+          NEXT_PUBLIC_API_URL: /api
+        run: npm run build
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3.6.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.11.1
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4.3.1
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Select immutable image tag
+        id: tag
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -Eeuo pipefail
+          tag="${REQUESTED_TAG:-pre-${GITHUB_SHA}}"
+          [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+            echo 'Invalid image tag' >&2
+            exit 1
+          }
+          {
+            printf 'IMAGE_TAG=%s\n' "$tag"
+            printf 'BACKEND_IMAGE=%s/aelb-pre-backend:%s\n' "$ECR_REGISTRY" "$tag"
+            printf 'FRONTEND_IMAGE=%s/aelb-pre-frontend:%s\n' "$ECR_REGISTRY" "$tag"
+          } >> "$GITHUB_ENV"
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          printf 'Tag: %s\nBackend image: %s/aelb-pre-backend:%s\nFrontend image: %s/aelb-pre-frontend:%s\n' \
+            "$tag" "$ECR_REGISTRY" "$tag" "$ECR_REGISTRY" "$tag"
+
+      - name: Build and push ARM64 images
+        if: ${{ inputs.image_tag == '' }}
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+          DOCKER_CACHE_FROM: gha
+          DOCKER_CACHE_TO: gha
+        run: ./scripts/build-pre.sh
+
+      - name: Sync PRE runtime through SSM
+        id: sync
+        env:
+          BACKEND_IMAGE: ${{ env.BACKEND_IMAGE }}
+          FRONTEND_IMAGE: ${{ env.FRONTEND_IMAGE }}
+          GIT_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command_id="$(./scripts/sync-pre-runtime.sh)"
+          [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]] || {
+            echo "Unexpected SSM command id: $command_id" >&2
+            exit 1
+          }
+          printf 'SSM sync CommandId: %s\n' "$command_id"
+          printf 'command_id=%s\n' "$command_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for runtime sync
+        env:
+          COMMAND_ID: ${{ steps.sync.outputs.command_id }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || true)"
+            case "$status" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "SSM sync failed: $status" >&2
+                aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml >&2 || true
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+          [[ "${status:-}" == Success ]] || { echo 'Timed out waiting for SSM sync' >&2; exit 1; }
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query 'StandardOutputContent' --output text
+
+      - name: Deploy PRE through SSM
+        id: deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          command_id="$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript --comment "AELB PRE deploy ${GITHUB_SHA}" \
+            --parameters 'commands=["/opt/aelb/deploy-pre.sh"]' \
+            --query 'Command.CommandId' --output text)"
+          printf 'SSM deploy CommandId: %s\n' "$command_id"
+          printf 'command_id=%s\n' "$command_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment and show result
+        env:
+          COMMAND_ID: ${{ steps.deploy.outputs.command_id }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for attempt in $(seq 1 60); do
+            status="$(aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || true)"
+            case "$status" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "SSM deploy failed: $status" >&2
+                aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml >&2 || true
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+          [[ "${status:-}" == Success ]] || { echo 'Timed out waiting for SSM deploy' >&2; exit 1; }
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml
+
+      - name: Verify containers and MySQL mount through SSM
+        id: health
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          commands='[
+            "set -Eeuo pipefail",
+            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do docker inspect -f \"{{.Name}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\"; done",
+            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do state=\"$(docker inspect -f \"{{.State.Status}}\" \"$container\")\"; health=\"$(docker inspect -f \"{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\")\"; [[ \"$state\" == running && \"$health\" == healthy ]] || exit 1; done",
+            "mountpoint -q /var/lib/aelb/mysql",
+            "mount_info=\"$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,TARGET)\"; echo \"$mount_info\"; [[ \"$mount_info\" == 3911d963-0a55-4ea7-9898-855e58e67ef2\\ /var/lib/aelb/mysql ]]"
+          ]'
+          command_id="$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript --comment "AELB PRE health ${GITHUB_SHA}" \
+            --parameters "{\"commands\":${commands}}" --query 'Command.CommandId' --output text)"
+          for attempt in $(seq 1 36); do
+            status="$(aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$command_id" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || true)"
+            case "$status" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                echo "Health verification failed: $status" >&2
+                aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$command_id" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml >&2 || true
+                exit 1 ;;
+            esac
+            sleep 5
+          done
+          [[ "${status:-}" == Success ]] || { echo 'Timed out waiting for health verification' >&2; exit 1; }
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$command_id" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml
+
+      - name: HTTP smoke tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-connrefused --max-time 15 "$PRE_URL/" >/dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-connrefused --max-time 15 "$PRE_URL/api/championships" >/dev/null
+          echo "HTTP smoke tests passed: $PRE_URL/ and $PRE_URL/api/championships"
