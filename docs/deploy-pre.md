@@ -222,6 +222,7 @@ arn:aws:iam::537735703239:oidc-provider/token.actions.githubusercontent.com
 El rol `aelb-pre-github-deploy` tiene permisos limitados a:
 
 - Publicar imágenes en `aelb-pre-backend` y `aelb-pre-frontend`.
+- Consultar los manifiestos de esas imágenes durante la publicación (`ecr:BatchGetImage`).
 - Enviar comandos SSM a `i-073035077dc228e14` usando `AWS-RunShellScript`.
 - Leer el resultado de los comandos SSM.
 
