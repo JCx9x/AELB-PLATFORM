@@ -218,11 +218,11 @@ jobs:
         run: |
           set -Eeuo pipefail
           commands='[
-            "set -Eeuo pipefail",
+            "set -eu",
             "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do docker inspect -f \"{{.Name}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\"; done",
-            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do state=\"$(docker inspect -f \"{{.State.Status}}\" \"$container\")\"; health=\"$(docker inspect -f \"{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\")\"; [[ \"$state\" == running && \"$health\" == healthy ]] || exit 1; done",
+            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do state=\"$(docker inspect -f \"{{.State.Status}}\" \"$container\")\"; health=\"$(docker inspect -f \"{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\")\"; [ \"$state\" = running ] && [ \"$health\" = healthy ] || exit 1; done",
             "mountpoint -q /var/lib/aelb/mysql",
-            "mount_info=\"$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,TARGET)\"; echo \"$mount_info\"; [[ \"$mount_info\" == 3911d963-0a55-4ea7-9898-855e58e67ef2\\ /var/lib/aelb/mysql ]]"
+            "mount_info=\"$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,TARGET)\"; echo \"$mount_info\"; [ \"$mount_info\" = 3911d963-0a55-4ea7-9898-855e58e67ef2\\ /var/lib/aelb/mysql ]"
           ]'
           command_id="$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript --comment "AELB PRE health ${GITHUB_SHA}" \
