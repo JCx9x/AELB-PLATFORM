@@ -14,6 +14,7 @@ module "storage" {
   aws_region                = var.aws_region
   backup_retention_days     = var.backup_retention_days
   ecr_image_retention_count = var.ecr_image_retention_count
+  files_allowed_origins   = var.files_allowed_origins
 }
 
 module "iam" {

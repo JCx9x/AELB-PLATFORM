@@ -11,6 +11,17 @@ locals {
 resource "aws_s3_bucket" "files" { bucket = local.files_bucket }
 resource "aws_s3_bucket" "backups" { bucket = local.backup_bucket }
 
+resource "aws_s3_bucket_cors_configuration" "files" {
+  bucket = aws_s3_bucket.files.id
+  cors_rule {
+    allowed_methods  = ["GET", "PUT", "POST", "HEAD"]
+    allowed_origins = var.files_allowed_origins
+    allowed_headers  = ["*"]
+    expose_headers   = ["ETag"]
+    max_age_seconds  = 3600
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "files" {
   bucket                  = aws_s3_bucket.files.id
   block_public_acls       = true

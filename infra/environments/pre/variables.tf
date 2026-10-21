@@ -92,3 +92,9 @@ variable "parameter_prefix" {
     error_message = "parameter_prefix must start and end with '/'."
   }
 }
+
+variable "files_allowed_origins" {
+  type    = list(string)
+  default = ["http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com"]
+  description = "Browser origins allowed to access presigned file URLs."
+}
