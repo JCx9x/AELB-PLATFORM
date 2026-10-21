@@ -17,7 +17,7 @@ public class EmailProperties {
     private int processingTimeoutMinutes = 10;
     private int sentRetentionDays = 30;
     private String frontendPublicUrl = "http://localhost:3000";
-    private String awsRegion = "eu-south-2";
+    private String sesRegion = "eu-south-2";
     private String smtpHost = "localhost";
     private int smtpPort = 1025;
     private boolean smtpAuth;
@@ -43,7 +43,7 @@ public class EmailProperties {
     public int getProcessingTimeoutMinutes() { return processingTimeoutMinutes; } public void setProcessingTimeoutMinutes(int v) { processingTimeoutMinutes = v; }
     public int getSentRetentionDays() { return sentRetentionDays; } public void setSentRetentionDays(int v) { sentRetentionDays = v; }
     public String getFrontendPublicUrl() { return frontendPublicUrl; } public void setFrontendPublicUrl(String v) { frontendPublicUrl = v; }
-    public String getAwsRegion() { return awsRegion; } public void setAwsRegion(String v) { awsRegion = v; }
+    public String getSesRegion() { return sesRegion; } public void setSesRegion(String v) { sesRegion = v; }
     public String getSmtpHost() { return smtpHost; } public void setSmtpHost(String v) { smtpHost = v; }
     public int getSmtpPort() { return smtpPort; } public void setSmtpPort(int v) { smtpPort = v; }
     public boolean isSmtpAuth() { return smtpAuth; } public void setSmtpAuth(boolean v) { smtpAuth = v; }

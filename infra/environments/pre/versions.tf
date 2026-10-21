@@ -14,3 +14,8 @@ provider "aws" {
     tags = { Project = "AELB", Environment = var.environment, ManagedBy = "Terraform" }
   }
 }
+
+provider "aws" {
+  alias  = "ses"
+  region = "eu-south-1"
+}

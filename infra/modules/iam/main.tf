@@ -63,7 +63,7 @@ resource "aws_iam_role_policy" "ec2_app" {
       ], var.ses_identity_arn == "" ? [] : [{
         Sid      = "SendEmailFromVerifiedIdentity"
         Effect   = "Allow"
-        Action   = ["ses:SendEmail", "ses:SendRawEmail"]
+        Action   = ["ses:SendEmail"]
         Resource = var.ses_identity_arn
     }])
   })

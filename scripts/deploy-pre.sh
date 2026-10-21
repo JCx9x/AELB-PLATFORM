@@ -19,6 +19,13 @@ set +a
 : "${STRIPE_CANCEL_URL:?STRIPE_CANCEL_URL is required}"
 : "${STRIPE_WEBHOOK_ENABLED:?STRIPE_WEBHOOK_ENABLED is required}"
 
+EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
+EMAIL_WORKER_ENABLED="${EMAIL_WORKER_ENABLED:-false}"
+EMAIL_PROVIDER="${EMAIL_PROVIDER:-ses}"
+EMAIL_FROM="${EMAIL_FROM:-javiercanoramirez@gmail.com}"
+EMAIL_FROM_NAME="${EMAIL_FROM_NAME:-AELB PRE}"
+EMAIL_SES_REGION="${EMAIL_SES_REGION:-eu-south-1}"
+
 command -v aws >/dev/null || { echo "Falta AWS CLI" >&2; exit 1; }
 command -v docker >/dev/null || { echo "Falta Docker" >&2; exit 1; }
 command -v findmnt >/dev/null || { echo "Falta findmnt" >&2; exit 1; }
@@ -60,6 +67,10 @@ mysql_password="$(get_secret mysql/password)"
 mysql_root_password="$(get_secret mysql/root-password)"
 jwt_secret="$(get_secret jwt/secret)"
 stripe_secret_key="$(get_secret stripe/secret-key)"
+email_token_encryption_key=""
+if [[ "$EMAIL_ENABLED" == true ]]; then
+  email_token_encryption_key="$(get_secret email/token-encryption-key)"
+fi
 if [[ "$STRIPE_WEBHOOK_ENABLED" == true ]]; then
   stripe_webhook_secret="$(get_secret stripe/webhook-secret)"
 else
@@ -69,13 +80,16 @@ validate_secret mysql/password "$mysql_password"
 validate_secret mysql/root-password "$mysql_root_password"
 validate_secret jwt/secret "$jwt_secret"
 validate_secret stripe/secret-key "$stripe_secret_key"
+if [[ "$EMAIL_ENABLED" == true ]]; then
+  validate_secret email/token-encryption-key "$email_token_encryption_key"
+fi
 if [[ "$STRIPE_WEBHOOK_ENABLED" == true ]]; then
   validate_secret stripe/webhook-secret "$stripe_webhook_secret"
 fi
 
 umask 077
 env_tmp="$(mktemp /opt/aelb/config/pre.env.XXXXXX)"
-trap 'rm -f "$env_tmp"; unset mysql_password mysql_root_password jwt_secret stripe_secret_key stripe_webhook_secret' EXIT
+trap 'rm -f "$env_tmp"; unset mysql_password mysql_root_password jwt_secret stripe_secret_key stripe_webhook_secret email_token_encryption_key' EXIT
 cat > "$env_tmp" <<EOF
 MYSQL_DATABASE=aelb_db
 MYSQL_USER=aelb_user
@@ -101,10 +115,13 @@ STRIPE_WEBHOOK_SECRET=$stripe_webhook_secret
 STRIPE_CURRENCY=eur
 STRIPE_SUCCESS_URL=$STRIPE_SUCCESS_URL
 STRIPE_CANCEL_URL=$STRIPE_CANCEL_URL
-EMAIL_ENABLED=false
-EMAIL_WORKER_ENABLED=false
-EMAIL_FROM=
-EMAIL_FROM_NAME=AELB
+EMAIL_ENABLED=$EMAIL_ENABLED
+EMAIL_WORKER_ENABLED=$EMAIL_WORKER_ENABLED
+EMAIL_PROVIDER=$EMAIL_PROVIDER
+EMAIL_FROM=$EMAIL_FROM
+EMAIL_FROM_NAME=$EMAIL_FROM_NAME
+EMAIL_SES_REGION=$EMAIL_SES_REGION
+EMAIL_TOKEN_ENCRYPTION_KEY=$email_token_encryption_key
 FRONTEND_PUBLIC_URL=$FRONTEND_PUBLIC_URL
 APP_ENV=pre
 APP_VERSION=${APP_VERSION:-pre}

@@ -13,13 +13,22 @@ set -Eeuo pipefail
 : "${STRIPE_CANCEL_URL:?STRIPE_CANCEL_URL is required}"
 : "${STRIPE_WEBHOOK_ENABLED:?STRIPE_WEBHOOK_ENABLED is required}"
 
+EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
+EMAIL_WORKER_ENABLED="${EMAIL_WORKER_ENABLED:-false}"
+EMAIL_PROVIDER="${EMAIL_PROVIDER:-ses}"
+EMAIL_FROM="${EMAIL_FROM:-javiercanoramirez@gmail.com}"
+EMAIL_FROM_NAME="${EMAIL_FROM_NAME:-AELB PRE}"
+EMAIL_SES_REGION="${EMAIL_SES_REGION:-eu-south-1}"
+
 command -v aws >/dev/null || { echo "Falta AWS CLI" >&2; exit 1; }
 command -v jq >/dev/null || { echo "Falta jq" >&2; exit 1; }
 command -v base64 >/dev/null || { echo "Falta base64" >&2; exit 1; }
 
 for value in "$FILES_BUCKET" "$BACKUPS_BUCKET" "$BACKEND_IMAGE" "$FRONTEND_IMAGE" \
   "$CORS_ALLOWED_ORIGINS" "$FRONTEND_PUBLIC_URL" "$STRIPE_SUCCESS_URL" \
-  "$STRIPE_CANCEL_URL" "$STRIPE_WEBHOOK_ENABLED"; do
+  "$STRIPE_CANCEL_URL" "$STRIPE_WEBHOOK_ENABLED" "$EMAIL_ENABLED" \
+  "$EMAIL_WORKER_ENABLED" "$EMAIL_PROVIDER" "$EMAIL_FROM" "$EMAIL_FROM_NAME" \
+  "$EMAIL_SES_REGION"; do
   [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || {
     echo "Los valores de runtime no pueden contener saltos de línea" >&2
     exit 1
@@ -48,6 +57,12 @@ umask 077
   printf 'STRIPE_SUCCESS_URL=%q\n' "$STRIPE_SUCCESS_URL"
   printf 'STRIPE_CANCEL_URL=%q\n' "$STRIPE_CANCEL_URL"
   printf 'STRIPE_WEBHOOK_ENABLED=%q\n' "$STRIPE_WEBHOOK_ENABLED"
+  printf 'EMAIL_ENABLED=%q\n' "$EMAIL_ENABLED"
+  printf 'EMAIL_WORKER_ENABLED=%q\n' "$EMAIL_WORKER_ENABLED"
+  printf 'EMAIL_PROVIDER=%q\n' "$EMAIL_PROVIDER"
+  printf 'EMAIL_FROM=%q\n' "$EMAIL_FROM"
+  printf 'EMAIL_FROM_NAME=%q\n' "$EMAIL_FROM_NAME"
+  printf 'EMAIL_SES_REGION=%q\n' "$EMAIL_SES_REGION"
   printf 'DOMAIN_NAME=%q\n' "${DOMAIN_NAME:-:80}"
   printf 'APP_VERSION=%q\n' "${APP_VERSION:-pre}"
   printf 'GIT_COMMIT=%q\n' "${GIT_COMMIT:-unknown}"

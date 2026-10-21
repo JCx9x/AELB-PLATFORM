@@ -77,6 +77,11 @@ variable "ses_identity_arn" {
   default     = ""
   description = "Optional verified SES identity ARN for transactional email."
 }
+variable "ses_identity_email" {
+  type        = string
+  default     = "javiercanoramirez@gmail.com"
+  description = "PRE SES email identity to verify manually in eu-south-1."
+}
 
 variable "parameter_prefix" {
   type        = string

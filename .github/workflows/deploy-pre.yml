@@ -33,6 +33,12 @@ env:
   STRIPE_SUCCESS_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
   STRIPE_CANCEL_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled
   STRIPE_WEBHOOK_ENABLED: "false"
+  EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
+  EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
+  EMAIL_PROVIDER: ses
+  EMAIL_FROM: javiercanoramirez@gmail.com
+  EMAIL_FROM_NAME: AELB PRE
+  EMAIL_SES_REGION: eu-south-1
   APP_VERSION: pre
 
 jobs:

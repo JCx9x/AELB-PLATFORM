@@ -9,7 +9,7 @@ Esta IaC crea un PRE pequeño en `eu-south-2`: una VPC con una única subnet pú
 - El frontend compila `NEXT_PUBLIC_API_URL`. Las imágenes PRE deben construirse con `NEXT_PUBLIC_API_URL=/api`; Caddy conserva `/api/*` y el body original del webhook al hacer `reverse_proxy`.
 - El esquema base es `database/schema.sql` y Hibernate valida (`ddl-auto=validate`). Las migraciones existentes no se cambian.
 - El backend ya implementa S3/presigned URLs, Stripe y credenciales por variables; el rol EC2 proporciona la identidad AWS. No se usan access keys.
-- El perfil `prod` usa SES para correo transaccional. Es opcional en PRE: si se configura `ses_identity_arn`, el rol obtiene solo `ses:SendEmail`/`ses:SendRawEmail` para esa identidad verificada; si se deja vacío, el despliegue no concede permisos SES.
+- El perfil `prod` usa SES para correo transaccional. PRE puede habilitarlo con la identidad de email Terraform configurada en `eu-south-1`; el Instance Role obtiene únicamente `ses:SendEmail` para esa identidad verificada.
 - El remoto actual es `JCx9x/AELB-PLATFORM`; OIDC de GitHub está desactivado por defecto y se habilita explícitamente con variables.
 
 ## Estructura
@@ -81,7 +81,7 @@ AWS_REGION=eu-south-2 ./scripts/put-pre-secrets.sh
 
 Para el primer PRE HTTP, el script solicita sin eco: `mysql/root-password`, `mysql/password`, `jwt/secret` y `stripe/secret-key`. El email está deshabilitado mediante `EMAIL_ENABLED=false` y el webhook Stripe mediante `STRIPE_WEBHOOK_ENABLED=false`; por tanto no se necesitan SES, `EMAIL_FROM`, `email/token-encryption-key` ni `stripe/webhook-secret` todavía. No uses `terraform.tfvars`, outputs, user-data ni Git para estos valores.
 
-Los valores no secretos necesarios para el despliegue son: buckets y repositorios obtenidos por outputs, URLs PRE, `CORS_ALLOWED_ORIGINS`, `EMAIL_FROM`, `EMAIL_FROM_NAME` y el tag SHA de las imágenes.
+Los valores no secretos necesarios para el despliegue son: buckets y repositorios obtenidos por outputs, URLs PRE, `CORS_ALLOWED_ORIGINS`, `EMAIL_FROM`, `EMAIL_FROM_NAME`, `EMAIL_SES_REGION` y el tag SHA de las imágenes. La clave de cifrado de tokens de email, cuando el correo está habilitado, se recupera únicamente dentro de la EC2 desde `/aelb/pre/email/token-encryption-key`.
 
 ## Imágenes y despliegue por SSM
 

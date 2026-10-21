@@ -29,7 +29,12 @@ module "iam" {
   enable_github_oidc      = var.enable_github_oidc
   github_repository       = var.github_repository
   github_environment      = var.github_environment
-  ses_identity_arn        = var.ses_identity_arn
+  ses_identity_arn        = aws_ses_email_identity.pre.arn
+}
+
+resource "aws_ses_email_identity" "pre" {
+  provider = aws.ses
+  email    = var.ses_identity_email
 }
 
 module "compute" {
