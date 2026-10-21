@@ -230,8 +230,10 @@ No utiliza claves AWS permanentes dentro de GitHub.
 La política de confianza debe permitir el subject OIDC del environment:
 
 ```text
-repo:JCx9x/AELB-PLATFORM:environment:pre
+repo:JCx9x@82141312/AELB-PLATFORM@1324905612:environment:pre
 ```
+
+GitHub puede incluir los identificadores internos de la organización y del repositorio en el subject OIDC. El valor anterior es el observado en CloudTrail para este repositorio.
 
 El environment de GitHub está configurado para aceptar únicamente despliegues desde `pre`.
 
