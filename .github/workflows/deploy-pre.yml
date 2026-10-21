@@ -32,7 +32,7 @@ env:
   FRONTEND_PUBLIC_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
   STRIPE_SUCCESS_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
   STRIPE_CANCEL_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled
-  STRIPE_WEBHOOK_ENABLED: "false"
+  STRIPE_WEBHOOK_ENABLED: ${{ vars.STRIPE_WEBHOOK_ENABLED || 'false' }}
   EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
   EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
   EMAIL_PROVIDER: ses
