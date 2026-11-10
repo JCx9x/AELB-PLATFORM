@@ -204,7 +204,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 180); do
             status="$(aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || true)"
             case "$status" in
               Success) break ;;
@@ -215,7 +215,11 @@ jobs:
             esac
             sleep 5
           done
-          [[ "${status:-}" == Success ]] || { echo 'Timed out waiting for SSM deploy' >&2; exit 1; }
+          [[ "${status:-}" == Success ]] || {
+            echo "Timed out waiting for SSM deploy (last status: ${status:-unknown})" >&2
+            aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml >&2 || true
+            exit 1
+          }
           aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query '{stdout:StandardOutputContent,stderr:StandardErrorContent}' --output yaml
 
       - name: Verify containers and MySQL mount through SSM

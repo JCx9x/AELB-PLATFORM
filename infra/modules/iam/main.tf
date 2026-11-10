@@ -61,14 +61,13 @@ resource "aws_iam_role_policy" "ec2_app" {
         Resource = data.aws_kms_alias.ssm.target_key_arn
       },
       {
-        # logs:CreateLogStream authorizes on the "log-group" resource type
-        # (ARN with no suffix) — see AWS CloudWatch Logs service authorization
-        # reference. aws_cloudwatch_log_group.arn is already a bare log-group
-        # ARN (the provider strips any ":*" the API returns), so it's used as-is.
+        # logs:CreateLogStream is evaluated against the stream ARN being created
+        # (".../log-group:NAME:log-stream:STREAM"): with only the bare log-group
+        # ARN, dockerd gets AccessDenied and new containers hang in "Created".
         Sid      = "AppLogsCreateStream"
         Effect   = "Allow"
         Action   = ["logs:CreateLogStream"]
-        Resource = var.cloudwatch_log_group_arns
+        Resource = concat(var.cloudwatch_log_group_arns, [for arn in var.cloudwatch_log_group_arns : "${arn}:log-stream:*"])
       },
       {
         # logs:PutLogEvents authorizes on the "log-stream" resource type

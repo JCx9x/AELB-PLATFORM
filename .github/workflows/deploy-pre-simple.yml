@@ -114,7 +114,7 @@ jobs:
           wait_for_ssm() {
             local command_id="$1"
             local status='Pending'
-            for _ in $(seq 1 60); do
+            for _ in $(seq 1 180); do
               status="$(aws ssm get-command-invocation \
                 --region "$AWS_REGION" --command-id "$command_id" \
                 --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || true)"
