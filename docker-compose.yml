@@ -148,7 +148,7 @@ services:
       EMAIL_BATCH_SIZE:           ${EMAIL_BATCH_SIZE:-10}
       EMAIL_MAX_RETRIES:          ${EMAIL_MAX_RETRIES:-5}
       EMAIL_FROM:                 ${EMAIL_FROM:-noreply@localhost.test}
-      EMAIL_FROM_NAME:            ${EMAIL_FROM_NAME:-AELB}
+      EMAIL_FROM_NAME:            ${EMAIL_FROM_NAME:-AELB · Asociación Española de Lucha de Brazos}
       SMTP_HOST:                  mailpit
       SMTP_PORT:                  1025
       FRONTEND_PUBLIC_URL:        ${FRONTEND_PUBLIC_URL:-http://localhost:3000}

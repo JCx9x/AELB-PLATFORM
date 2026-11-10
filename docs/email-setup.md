@@ -30,7 +30,7 @@ EMAIL_PROVIDER=ses
 EMAIL_ENABLED=true
 EMAIL_SES_REGION=eu-south-1
 EMAIL_FROM=noreply@midominio.es
-EMAIL_FROM_NAME=AELB
+EMAIL_FROM_NAME="AELB · Asociación Española de Lucha de Brazos"
 AWS_REGION=eu-south-2
 EMAIL_SES_REGION=eu-south-1
 EMAIL_MAX_PER_SECOND=2
@@ -70,3 +70,13 @@ SELECT id, type, attempts, next_attempt_at, last_error FROM email_outbox WHERE s
 Para detener envíos sin apagar el backend: `EMAIL_WORKER_ENABLED=false`. Los jobs pendientes permanecen en la base de datos. Los `SENT` se limpian después de la retención configurada (30 días por defecto); los `FAILED` se conservan para diagnóstico.
 
 La limitación por IP actual es en memoria y válida para una instancia. Si se despliegan varias réplicas, mover los rate limits de endpoints a un almacén compartido/WAF; el claim del outbox ya utiliza lock pesimista para evitar doble procesamiento.
+
+## Plantilla corporativa
+
+Todos los correos se renderizan con `AelbEmailTemplate` sobre el layout `backendweb/src/main/resources/email/aelb-email-layout.html`, que replica los tokens de la web (`#121212`, `#af101a`/`#d32f2f`, `#e4beba`, tipografía Lexend con fallback Helvetica/Arial). Incluye:
+
+- Cabecera con el distintivo **AELB** y el nombre completo de la asociación; el asunto se prefija con `AELB · `.
+- Aviso de correo generado automáticamente pidiendo no responder (también en la versión de texto plano).
+- Pie con enlace a la web y a la política de privacidad (`FRONTEND_PUBLIC_URL`).
+
+Para un nuevo tipo de correo basta con construir un `AelbEmailTemplate.Content` (antetítulo, título, párrafos, filas de detalle, botón y nota opcionales) en `EmailWorker.render`. Los valores se escapan siempre. SES envía el remitente como `"EMAIL_FROM_NAME" <EMAIL_FROM>` (por defecto `AELB · Asociación Española de Lucha de Brazos`).

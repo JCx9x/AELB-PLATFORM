@@ -34,7 +34,7 @@ env:
   EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
   EMAIL_PROVIDER: ses
   EMAIL_FROM: javiercanoramirez@gmail.com
-  EMAIL_FROM_NAME: AELB PRE
+  EMAIL_FROM_NAME: "AELB · Asociación Española de Lucha de Brazos"
   EMAIL_SES_REGION: eu-south-1
   APP_VERSION: pre
 

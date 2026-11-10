@@ -17,7 +17,7 @@ EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
 EMAIL_WORKER_ENABLED="${EMAIL_WORKER_ENABLED:-false}"
 EMAIL_PROVIDER="${EMAIL_PROVIDER:-ses}"
 EMAIL_FROM="${EMAIL_FROM:-javiercanoramirez@gmail.com}"
-EMAIL_FROM_NAME="${EMAIL_FROM_NAME:-AELB PRE}"
+EMAIL_FROM_NAME="${EMAIL_FROM_NAME:-AELB · Asociación Española de Lucha de Brazos}"
 EMAIL_SES_REGION="${EMAIL_SES_REGION:-eu-south-1}"
 
 command -v aws >/dev/null || { echo "Falta AWS CLI" >&2; exit 1; }

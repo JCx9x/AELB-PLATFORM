@@ -8,7 +8,7 @@ public class EmailProperties {
     private String provider = "smtp";
     private String appEnv = "local";
     private String from = "noreply@localhost.test";
-    private String fromName = "AELB";
+    private String fromName = "AELB · Asociación Española de Lucha de Brazos";
     private boolean workerEnabled = true;
     private int maxPerSecond = 10;
     private int workerConcurrency = 1;
