@@ -26,7 +26,15 @@ services:
       start_period: 10s
     networks: [aelb-pre-net]
     mem_limit: 128m
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-south-2}
+        awslogs-group: /aelb/pre/caddy
+        awslogs-create-group: "false"
+        awslogs-stream: caddy-{{.ID}}
+        mode: non-blocking
+        max-buffer-size: 1m
 
   mysql:
     image: mysql:8.4
@@ -46,7 +54,15 @@ services:
       start_period: 40s
     networks: [aelb-pre-net]
     mem_limit: 700m
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-south-2}
+        awslogs-group: /aelb/pre/mysql
+        awslogs-create-group: "false"
+        awslogs-stream: mysql-{{.ID}}
+        mode: non-blocking
+        max-buffer-size: 1m
 
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
@@ -74,7 +90,16 @@ services:
       start_period: 45s
     networks: [aelb-pre-net]
     mem_limit: 512m
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-south-2}
+        awslogs-group: /aelb/pre/backend
+        awslogs-create-group: "false"
+        awslogs-stream: backend-{{.ID}}
+        awslogs-multiline-pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+        mode: non-blocking
+        max-buffer-size: 1m
 
   frontend:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
@@ -88,7 +113,15 @@ services:
       start_period: 20s
     networks: [aelb-pre-net]
     mem_limit: 384m
-    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-south-2}
+        awslogs-group: /aelb/pre/frontend
+        awslogs-create-group: "false"
+        awslogs-stream: frontend-{{.ID}}
+        mode: non-blocking
+        max-buffer-size: 1m
 
 volumes:
   caddy-data:

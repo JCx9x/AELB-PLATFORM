@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { loginUser, type ApiError } from '../lib/api'
+import { loginUser, resendVerificationByEmail, type ApiError } from '../lib/api'
 import { saveSession } from '../lib/auth'
 
 function LoginForm() {
@@ -18,11 +18,15 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberDevice, setRememberDevice] = useState(false)
   const [error, setError]             = useState<string | null>(null)
+  const [needsVerification, setNeedsVerification] = useState(false)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [loading, setLoading]         = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setNeedsVerification(false)
+    setResendState('idle')
     setLoading(true)
 
     try {
@@ -33,11 +37,22 @@ function LoginForm() {
       const apiErr = err as ApiError
       if (apiErr.status === 401 || apiErr.status === 403) {
         setError(apiErr.detail)
+        setNeedsVerification(apiErr.code === 'EMAIL_NOT_VERIFIED')
       } else {
         setError(t('errorConexion'))
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResendVerification() {
+    setResendState('sending')
+    try {
+      await resendVerificationByEmail(email)
+      setResendState('sent')
+    } catch {
+      setResendState('error')
     }
   }
 
@@ -90,7 +105,26 @@ function LoginForm() {
                   <path strokeLinecap="round" strokeLinejoin="round"
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {error}
+                <div className="flex-1">
+                  <p>{error}</p>
+                  {needsVerification && (
+                    resendState === 'sent' ? (
+                      <p className="mt-2 font-medium">{t('verificacionReenviada')}</p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resendState === 'sending'}
+                        className="mt-2 font-semibold underline disabled:opacity-60"
+                      >
+                        {resendState === 'sending' ? t('reenviandoVerificacion') : t('reenviarVerificacion')}
+                      </button>
+                    )
+                  )}
+                  {needsVerification && resendState === 'error' && (
+                    <p className="mt-2">{t('errorReenvioVerificacion')}</p>
+                  )}
+                </div>
               </div>
             )}
 

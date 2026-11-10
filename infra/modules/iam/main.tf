@@ -59,12 +59,32 @@ resource "aws_iam_role_policy" "ec2_app" {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
         Resource = data.aws_kms_alias.ssm.target_key_arn
+      },
+      {
+        # logs:CreateLogStream authorizes on the "log-group" resource type
+        # (ARN with no suffix) — see AWS CloudWatch Logs service authorization
+        # reference. aws_cloudwatch_log_group.arn is already a bare log-group
+        # ARN (the provider strips any ":*" the API returns), so it's used as-is.
+        Sid      = "AppLogsCreateStream"
+        Effect   = "Allow"
+        Action   = ["logs:CreateLogStream"]
+        Resource = var.cloudwatch_log_group_arns
+      },
+      {
+        # logs:PutLogEvents authorizes on the "log-stream" resource type
+        # (ARN ".../log-group:NAME:log-stream:STREAM"). Docker generates
+        # stream names at runtime ("backend-{{.ID}}"), so the stream segment
+        # must be wildcarded — a bare log-group ARN does not match it.
+        Sid      = "AppLogsPutEvents"
+        Effect   = "Allow"
+        Action   = ["logs:PutLogEvents"]
+        Resource = [for arn in var.cloudwatch_log_group_arns : "${arn}:log-stream:*"]
       }
       ], var.ses_identity_arn == "" ? [] : [{
         Sid      = "SendEmailFromVerifiedIdentity"
         Effect   = "Allow"
         Action   = ["ses:SendEmail"]
-        Resource = var.ses_identity_arn
+        Resource = compact([var.ses_identity_arn, var.ses_recipient_identity_arn])
     }])
   })
 }

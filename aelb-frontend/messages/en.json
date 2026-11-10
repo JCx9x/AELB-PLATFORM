@@ -205,7 +205,11 @@
     "creaTuCuenta": "Create your account",
     "privacidad": "Privacy",
     "terminos": "Terms",
-    "errorConexion": "Connection error with the server. Please try again."
+    "errorConexion": "Connection error with the server. Please try again.",
+    "reenviarVerificacion": "Resend verification email",
+    "reenviandoVerificacion": "Sending…",
+    "verificacionReenviada": "If the account can be verified, you'll receive an email shortly.",
+    "errorReenvioVerificacion": "Couldn't resend the email. Please try again later."
   },
   "ForgotPassword": {
     "brandLinea1": "SPANISH",

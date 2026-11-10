@@ -93,8 +93,16 @@ variable "parameter_prefix" {
   }
 }
 
-variable "files_allowed_origins" {
-  type    = list(string)
-  default = ["http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com"]
-  description = "Browser origins allowed to access presigned file URLs."
+variable "log_retention_days" {
+  type        = number
+  description = "Retention for the application CloudWatch Log Groups (one per container)."
+  default     = 14
+  validation {
+    # https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutRetentionPolicy.html
+    condition = contains([
+      1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096,
+      1827, 2192, 2557, 2922, 3288, 3653, 0
+    ], var.log_retention_days)
+    error_message = "log_retention_days must be one of the values CloudWatch Logs accepts for retentionInDays (0 = never expire)."
+  }
 }

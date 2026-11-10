@@ -32,7 +32,7 @@ env:
   FRONTEND_PUBLIC_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
   STRIPE_SUCCESS_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
   STRIPE_CANCEL_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled
-  STRIPE_WEBHOOK_ENABLED: ${{ vars.STRIPE_WEBHOOK_ENABLED || 'false' }}
+  STRIPE_WEBHOOK_ENABLED: "false"
   EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
   EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
   EMAIL_PROVIDER: ses
@@ -90,7 +90,7 @@ jobs:
 
       - name: Test frontend
         working-directory: aelb-frontend
-        run: npm run test --if-present
+        run: npm test
 
       - name: Typecheck frontend
         working-directory: aelb-frontend
@@ -100,7 +100,7 @@ jobs:
         working-directory: aelb-frontend
         env:
           NEXT_PUBLIC_API_URL: /api
-        run: npm run build
+        run: npm run build -- --webpack
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.6.0
@@ -121,7 +121,7 @@ jobs:
           REQUESTED_TAG: ${{ inputs.image_tag }}
         run: |
           set -Eeuo pipefail
-          tag="${REQUESTED_TAG:-pre-${GITHUB_SHA}-${GITHUB_RUN_ID}}"
+          tag="${REQUESTED_TAG:-pre-${GITHUB_SHA}}"
           [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
             echo 'Invalid image tag' >&2
             exit 1
@@ -141,7 +141,7 @@ jobs:
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
           DOCKER_CACHE_FROM: gha
           DOCKER_CACHE_TO: gha
-        run: bash ./scripts/build-pre.sh
+        run: ./scripts/build-pre.sh
 
       - name: Sync PRE runtime through SSM
         id: sync
@@ -152,7 +152,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          command_id="$(bash ./scripts/sync-pre-runtime.sh)"
+          command_id="$(./scripts/sync-pre-runtime.sh)"
           [[ "$command_id" =~ ^[0-9a-f-]{36}$ ]] || {
             echo "Unexpected SSM command id: $command_id" >&2
             exit 1
@@ -218,11 +218,11 @@ jobs:
         run: |
           set -Eeuo pipefail
           commands='[
-            "set -eu",
+            "set -Eeuo pipefail",
             "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do docker inspect -f \"{{.Name}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\"; done",
-            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do state=\"$(docker inspect -f \"{{.State.Status}}\" \"$container\")\"; health=\"$(docker inspect -f \"{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\")\"; [ \"$state\" = running ] && [ \"$health\" = healthy ] || exit 1; done",
+            "for container in aelb-pre-mysql-1 aelb-pre-backend-1 aelb-pre-frontend-1 aelb-pre-caddy-1; do state=\"$(docker inspect -f \"{{.State.Status}}\" \"$container\")\"; health=\"$(docker inspect -f \"{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}\" \"$container\")\"; [[ \"$state\" == running && \"$health\" == healthy ]] || exit 1; done",
             "mountpoint -q /var/lib/aelb/mysql",
-            "mount_info=\"$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,TARGET)\"; echo \"$mount_info\"; [ \"$mount_info\" = 3911d963-0a55-4ea7-9898-855e58e67ef2\\ /var/lib/aelb/mysql ]"
+            "mount_info=\"$(findmnt -rn -M /var/lib/aelb/mysql -o UUID,TARGET)\"; echo \"$mount_info\"; [[ \"$mount_info\" == 3911d963-0a55-4ea7-9898-855e58e67ef2\\ /var/lib/aelb/mysql ]]"
           ]'
           command_id="$(aws ssm send-command --region "$AWS_REGION" --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript --comment "AELB PRE health ${GITHUB_SHA}" \

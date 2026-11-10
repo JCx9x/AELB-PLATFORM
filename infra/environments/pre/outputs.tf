@@ -12,3 +12,4 @@ output "parameter_store_prefix" { value = var.parameter_prefix }
 output "mysql_volume_id" { value = module.compute.mysql_volume_id }
 output "session_manager_command" { value = "aws ssm start-session --target ${module.compute.instance_id} --region ${var.aws_region}" }
 output "github_deploy_role_arn" { value = module.iam.github_deploy_role_arn }
+output "log_group_names" { value = { for k, g in aws_cloudwatch_log_group.app : k => g.name } }

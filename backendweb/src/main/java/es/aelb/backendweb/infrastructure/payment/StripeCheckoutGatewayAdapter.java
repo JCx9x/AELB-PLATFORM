@@ -12,6 +12,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Adaptador HTTP de Stripe Checkout. La clave secreta nunca sale del backend. */
 public class StripeCheckoutGatewayAdapter implements StripeCheckoutGateway {
+    private static final Logger log = LoggerFactory.getLogger(StripeCheckoutGatewayAdapter.class);
     private static final URI CHECKOUT_SESSIONS_URL = URI.create("https://api.stripe.com/v1/checkout/sessions");
     private final StripeProperties properties;
     private final ObjectMapper objectMapper;
@@ -112,17 +115,21 @@ public class StripeCheckoutGatewayAdapter implements StripeCheckoutGateway {
                             return new StripeCheckoutSession(body.path("id").asText(), body.path("url").asText());
                         }
                     }
+                    log.warn("event=STRIPE_CHECKOUT_FAILED idempotencyKey={} attempt={} statusCode={} detail={} retryable={}",
+                            idempotencyKey, attempt + 1, response.statusCode(), describeError(response.body()), isRetryable(response.statusCode()));
                     if (!isRetryable(response.statusCode()) || attempt == attempts - 1) throw new StripeRequestException();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     recordFailure();
                     throw new StripeRequestException();
                 } catch (IOException e) {
+                    log.warn("event=STRIPE_CHECKOUT_RETRY idempotencyKey={} attempt={} error={}", idempotencyKey, attempt + 1, e.getClass().getSimpleName());
                     if (attempt == attempts - 1) { recordFailure(); throw new StripeRequestException(); }
                 } catch (StripeRequestException e) {
                     recordFailure();
                     throw e;
                 } catch (Exception e) {
+                    log.error("event=STRIPE_CHECKOUT_UNEXPECTED_ERROR idempotencyKey={} attempt={} exceptionType={}", idempotencyKey, attempt + 1, e.getClass().getName(), e);
                     recordFailure();
                     throw new StripeRequestException();
                 }
@@ -148,7 +155,22 @@ public class StripeCheckoutGatewayAdapter implements StripeCheckoutGateway {
     }
     private void recordFailure() {
         if (consecutiveFailures.incrementAndGet() >= Math.max(1, properties.getCircuitBreakerFailureThreshold())) {
+            boolean wasClosed = circuitOpenUntil < System.currentTimeMillis();
             circuitOpenUntil = System.currentTimeMillis() + Math.max(1000, properties.getCircuitBreakerOpenMs());
+            if (wasClosed) {
+                log.error("event=STRIPE_CIRCUIT_OPEN consecutiveFailures={} openForMs={}", consecutiveFailures.get(), properties.getCircuitBreakerOpenMs());
+            }
+        }
+    }
+    /** Extrae solo el código/tipo/mensaje de error de Stripe — nunca la cabecera Authorization ni datos de la petición.
+     * Visibilidad de paquete para poder probarla directamente sin levantar un servidor HTTP falso. */
+    String describeError(String body) {
+        try {
+            JsonNode error = objectMapper.readTree(body).path("error");
+            String combined = "code=" + error.path("code").asText("") + " type=" + error.path("type").asText("") + " message=" + error.path("message").asText("");
+            return combined.length() > 300 ? combined.substring(0, 300) : combined;
+        } catch (Exception e) {
+            return "unparseable response body (" + body.length() + " bytes)";
         }
     }
     private String formEncode(Map<String, String> form) { return form.entrySet().stream().map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8)).collect(java.util.stream.Collectors.joining("&")); }

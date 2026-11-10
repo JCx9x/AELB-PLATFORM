@@ -1,6 +1,17 @@
 http://{$DOMAIN_NAME} {
     encode zstd gzip
 
+    # H-10: sin esto, un 502/503/504 de Caddy (p. ej. el backend no responde
+    # tras un despliegue) no deja ningún rastro ni en Caddy ni en el backend.
+    # Caddy redacta Cookie/Set-Cookie/Authorization/Proxy-Authorization por
+    # defecto (ver "log_credentials" en la documentación de Caddy) — no se
+    # desactiva esa redacción aquí, así que no hace falta filtrar manualmente
+    # cabeceras ni cuerpos (estos últimos nunca se incluyen por defecto).
+    log {
+        output stdout
+        format json
+    }
+
     handle /api/* {
         reverse_proxy backend:8080
     }

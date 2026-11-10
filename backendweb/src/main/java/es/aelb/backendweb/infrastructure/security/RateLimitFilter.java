@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -23,6 +25,7 @@ import java.util.List;
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
     private record RouteLimit(String method, String pattern, int maxRequests, Duration window) {}
 
@@ -61,6 +64,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (limit != null) {
             String key = limit.method() + ":" + limit.pattern() + ":" + request.getRemoteAddr();
             if (!rateLimiter.tryConsume(key, limit.maxRequests(), limit.window())) {
+                log.warn("event=RATE_LIMIT_EXCEEDED method={} route={} ip={}", limit.method(), limit.pattern(), request.getRemoteAddr());
                 response.setStatus(429);
                 response.setContentType("application/problem+json");
                 response.getWriter().write(

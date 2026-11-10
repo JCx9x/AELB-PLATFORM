@@ -205,7 +205,11 @@
     "creaTuCuenta": "Crea tu cuenta",
     "privacidad": "Privacidad",
     "terminos": "Términos",
-    "errorConexion": "Error de conexión con el servidor. Inténtalo de nuevo."
+    "errorConexion": "Error de conexión con el servidor. Inténtalo de nuevo.",
+    "reenviarVerificacion": "Reenviar email de verificación",
+    "reenviandoVerificacion": "Enviando…",
+    "verificacionReenviada": "Si la cuenta puede verificarse, recibirás un email en breve.",
+    "errorReenvioVerificacion": "No se ha podido reenviar el email. Inténtalo de nuevo más tarde."
   },
   "ForgotPassword": {
     "brandLinea1": "ASOCIACIÓN",

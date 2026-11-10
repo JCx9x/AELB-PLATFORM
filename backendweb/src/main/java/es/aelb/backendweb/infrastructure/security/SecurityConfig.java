@@ -19,6 +19,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Arrays;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 /**
@@ -50,6 +52,7 @@ import org.slf4j.MDC;
 @EnableWebSecurity
 @EnableConfigurationProperties(AuthCookieProperties.class)
 public class SecurityConfig {
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Value("${aelb.cors.allowed-origins}")
     private String allowedOrigins;
@@ -84,7 +87,11 @@ public class SecurityConfig {
                         // ── Auth y registro ──────────────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/password/forgot", "/api/auth/password/reset", "/api/auth/email/verify").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/email/resend-verification").authenticated()
+                        // Una cuenta sin verificar no puede iniciar sesión (LoginUseCase), así
+                        // que este endpoint debe ser alcanzable sin sesión — igual que
+                        // password/forgot. El controlador identifica por sesión si la hay,
+                        // o por el email del cuerpo si no.
+                        .requestMatchers(HttpMethod.POST, "/api/auth/email/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         // El access token ya puede estar caducado al llamar a /refresh — la
                         // validez real la comprueba RefreshSessionUseCase contra el refresh token.
@@ -205,12 +212,14 @@ public class SecurityConfig {
                 .addFilterBefore(rateLimitFilter, JwtAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((req, res, e) -> {
+                            log.warn("event=AUTH_REQUIRED path={} method={}", req.getRequestURI(), req.getMethod());
                             res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             res.setContentType("application/problem+json");
                             res.setHeader("X-Correlation-ID", MDC.get("correlationId"));
                             res.getWriter().write("{\"status\":401,\"title\":\"Unauthorized\",\"detail\":\"Token ausente o inválido\",\"correlationId\":\"" + safeCorrelationId() + "\"}");
                         })
                         .accessDeniedHandler((req, res, e) -> {
+                            log.warn("event=AUTHZ_DENIED path={} method={}", req.getRequestURI(), req.getMethod());
                             res.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             res.setContentType("application/problem+json");
                             res.setHeader("X-Correlation-ID", MDC.get("correlationId"));

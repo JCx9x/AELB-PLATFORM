@@ -10,3 +10,8 @@ variable "enable_github_oidc" { type = bool }
 variable "github_repository" { type = string }
 variable "github_environment" { type = string }
 variable "ses_identity_arn" { type = string }
+variable "ses_recipient_identity_arn" {
+  type    = string
+  default = ""
+}
+variable "cloudwatch_log_group_arns" { type = list(string) }

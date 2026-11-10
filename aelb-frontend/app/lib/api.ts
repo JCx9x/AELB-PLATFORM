@@ -35,6 +35,7 @@ export interface ApiError {
   status: number
   title?: string
   detail: string
+  code?: string
   correlationId?: string
 }
 
@@ -177,6 +178,7 @@ async function parseError(response: Response): Promise<ApiError> {
       status: response.status,
       title:  body.title,
       detail: body.detail ?? body.message ?? 'Error desconocido',
+      code:   body.code,
       correlationId: body.correlationId ?? response.headers.get('X-Correlation-ID') ?? undefined,
     }
   } catch {
@@ -251,6 +253,15 @@ export async function verifyEmail(token: string): Promise<void> {
 
 export async function resendVerification(): Promise<{ message: string }> {
   const response = await fetchWithAuth('/api/auth/email/resend-verification', { method: 'POST' })
+  if (!response.ok) throw await parseError(response)
+  return response.json()
+}
+
+/** Para un usuario que aún no puede iniciar sesión: identifica la cuenta por email en vez
+ * de por sesión. Mismo endpoint que {@link resendVerification}, sin cookie de sesión. */
+export async function resendVerificationByEmail(email: string): Promise<{ message: string }> {
+  const headers = await getCsrfHeaders()
+  const response = await fetch(`${BASE_URL}/api/auth/email/resend-verification`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ email }) })
   if (!response.ok) throw await parseError(response)
   return response.json()
 }

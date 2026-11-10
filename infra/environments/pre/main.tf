@@ -7,6 +7,20 @@ module "network" {
   enable_https_ingress = false
 }
 
+# One log group per container. Docker's awslogs driver only needs to write
+# into an existing stream/group (see docker-compose.pre.yml); it never gets
+# logs:CreateLogGroup, so these must exist before the containers start.
+locals {
+  log_group_prefix = "/${lower(var.project_name)}/${var.environment}"
+  log_services     = ["caddy", "mysql", "backend", "frontend"]
+}
+
+resource "aws_cloudwatch_log_group" "app" {
+  for_each          = toset(local.log_services)
+  name              = "${local.log_group_prefix}/${each.value}"
+  retention_in_days = var.log_retention_days
+}
+
 module "storage" {
   source                    = "../../modules/storage"
   project_name              = var.project_name
@@ -14,23 +28,25 @@ module "storage" {
   aws_region                = var.aws_region
   backup_retention_days     = var.backup_retention_days
   ecr_image_retention_count = var.ecr_image_retention_count
-  files_allowed_origins   = var.files_allowed_origins
 }
 
 module "iam" {
-  source                  = "../../modules/iam"
-  project_name            = var.project_name
-  environment             = var.environment
-  aws_region              = var.aws_region
-  files_bucket_arn        = module.storage.files_bucket_arn
-  backups_bucket_arn      = module.storage.backups_bucket_arn
-  backend_repository_arn  = module.storage.backend_repository_arn
-  frontend_repository_arn = module.storage.frontend_repository_arn
-  parameter_prefix        = var.parameter_prefix
-  enable_github_oidc      = var.enable_github_oidc
-  github_repository       = var.github_repository
-  github_environment      = var.github_environment
-  ses_identity_arn        = aws_ses_email_identity.pre.arn
+  source                     = "../../modules/iam"
+  project_name               = var.project_name
+  environment                = var.environment
+  aws_region                 = var.aws_region
+  files_bucket_arn           = module.storage.files_bucket_arn
+  backups_bucket_arn         = module.storage.backups_bucket_arn
+  backend_repository_arn     = module.storage.backend_repository_arn
+  frontend_repository_arn    = module.storage.frontend_repository_arn
+  parameter_prefix           = var.parameter_prefix
+  enable_github_oidc         = var.enable_github_oidc
+  github_repository          = var.github_repository
+  github_environment         = var.github_environment
+  ses_identity_arn           = aws_ses_email_identity.pre.arn
+  ses_recipient_identity_arn = "arn:aws:ses:eu-south-1:${data.aws_caller_identity.current.account_id}:identity/javicanoramirez@gmail.com"
+  # aws_cloudwatch_log_group.arn already includes a trailing ":*" (AWS API behavior) — do not append it again.
+  cloudwatch_log_group_arns = [for g in aws_cloudwatch_log_group.app : g.arn]
 }
 
 resource "aws_ses_email_identity" "pre" {

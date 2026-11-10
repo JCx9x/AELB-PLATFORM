@@ -50,6 +50,7 @@ import es.aelb.backendweb.application.user.RequestPasswordResetUseCase;
 import es.aelb.backendweb.application.user.ResetPasswordUseCase;
 import es.aelb.backendweb.application.user.VerifyEmailUseCase;
 import es.aelb.backendweb.application.user.ResendEmailVerificationUseCase;
+import es.aelb.backendweb.application.user.ResendEmailVerificationByEmailUseCase;
 import es.aelb.backendweb.application.email.EmailService;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringPasswordResetTokenJpaRepository;
 import es.aelb.backendweb.infrastructure.persistence.jpa.repository.SpringEmailVerificationTokenJpaRepository;
@@ -189,6 +190,7 @@ public class BeanConfiguration {
     @Bean public ResetPasswordUseCase resetPasswordUseCase(SpringPasswordResetTokenJpaRepository tokens, UserRepository users, BCryptPasswordEncoder encoder) { return new ResetPasswordUseCase(tokens, users, encoder::encode); }
     @Bean public VerifyEmailUseCase verifyEmailUseCase(SpringEmailVerificationTokenJpaRepository tokens, UserRepository users) { return new VerifyEmailUseCase(tokens, users); }
     @Bean public ResendEmailVerificationUseCase resendEmailVerificationUseCase(UserRepository users, EmailService emails) { return new ResendEmailVerificationUseCase(users, emails); }
+    @Bean public ResendEmailVerificationByEmailUseCase resendEmailVerificationByEmailUseCase(UserRepository users, EmailService emails) { return new ResendEmailVerificationByEmailUseCase(users, emails); }
 
     @Bean
     public UpdateProfileUseCase updateProfileUseCase(UserRepository userRepository) {

@@ -13,7 +13,9 @@ import es.aelb.backendweb.domain.user.valueobject.Email;
  * 1. Búsqueda del usuario por email (fallo genérico si no existe).
  * 2. Verificación de la contraseña (fallo genérico si no coincide).
  * 3. Comprobación de que el usuario no está bloqueado.
- * 4. Devolución del resultado con los datos necesarios para emitir el token.
+ * 4. Comprobación de que el email está verificado — sin esto no se emite
+ *    ningún token, así que una cuenta sin verificar no puede acceder.
+ * 5. Devolución del resultado con los datos necesarios para emitir el token.
  *
  * El mensaje de error es intencionalmente genérico para no revelar
  * si el email existe o no en el sistema.
@@ -43,6 +45,10 @@ public class LoginUseCase implements UseCase<LoginCommand, LoginResult> {
             throw new UserBlockedException();
         }
 
+        if (!user.isEmailVerified()) {
+            throw new EmailNotVerifiedException();
+        }
+
         return new LoginResult(
                 user.getId().value(),
                 user.getEmail().value(),
@@ -67,6 +73,12 @@ public class LoginUseCase implements UseCase<LoginCommand, LoginResult> {
     public static final class UserBlockedException extends DomainException {
         public UserBlockedException() {
             super("La cuenta está bloqueada. Contacta con administración.");
+        }
+    }
+
+    public static final class EmailNotVerifiedException extends DomainException {
+        public EmailNotVerifiedException() {
+            super("Verifica tu email antes de iniciar sesión. Revisa tu bandeja de entrada o solicita un nuevo enlace.");
         }
     }
 }

@@ -1,5 +1,7 @@
 # Observabilidad de producción
 
+> Este documento describe el diseño objetivo (pensado para un futuro entorno con ALB/target groups). Para el estado **realmente implementado hoy en PRE** (CloudWatch Log Groups, driver `awslogs`, IAM, runbook con comandos reales), ver [`observability-pre.md`](observability-pre.md).
+
 La aplicación utiliza una capa deliberadamente pequeña:
 
 ```text

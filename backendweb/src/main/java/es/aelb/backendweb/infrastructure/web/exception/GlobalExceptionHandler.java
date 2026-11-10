@@ -42,6 +42,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LoginUseCase.InvalidCredentialsException.class)
     public ProblemDetail handleInvalidCredentials(LoginUseCase.InvalidCredentialsException ex) {
+        // Sin email/usuario en el log: RateLimitFilter ya acota por IP+ruta, y
+        // el volumen de WARN por sí solo basta para detectar fuerza bruta.
+        log.warn("event=AUTH_FAILED reason=INVALID_CREDENTIALS");
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
@@ -52,12 +55,26 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RefreshSessionUseCase.RefreshTokenReusedException.class)
     public ProblemDetail handleRefreshTokenReused(RefreshSessionUseCase.RefreshTokenReusedException ex) {
+        // Reutilizar un refresh token ya rotado es la señal más fuerte de robo
+        // de sesión que detecta hoy la plataforma: todas las sesiones del
+        // usuario quedan revocadas, y conviene poder contar estos eventos.
+        log.warn("event=AUTH_FAILED reason=REFRESH_TOKEN_REUSED");
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(LoginUseCase.UserBlockedException.class)
     public ProblemDetail handleUserBlocked(LoginUseCase.UserBlockedException ex) {
+        log.warn("event=AUTH_FAILED reason=USER_BLOCKED");
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(LoginUseCase.EmailNotVerifiedException.class)
+    public ProblemDetail handleEmailNotVerified(LoginUseCase.EmailNotVerifiedException ex) {
+        // code=EMAIL_NOT_VERIFIED permite al frontend distinguir este caso de un
+        // bloqueo administrativo y ofrecer directamente la opción de reenviar
+        // el email de verificación en vez de un mensaje de error sin salida.
+        log.warn("event=AUTH_FAILED reason=EMAIL_NOT_VERIFIED");
+        return problem(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED", ex.getMessage());
     }
 
     @ExceptionHandler(UpdateProfileUseCase.UserNotFoundException.class)
