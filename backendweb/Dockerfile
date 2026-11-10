@@ -1,5 +1,7 @@
 # --- Build stage ---
-FROM eclipse-temurin:21-jdk-alpine AS builder
+# El .jar no depende de la arquitectura: se compila en la plataforma nativa del runner (sin emulación QEMU)
+# y solo la imagen de ejecución es ARM64.
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 COPY mvnw pom.xml ./
 COPY .mvn .mvn

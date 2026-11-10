@@ -45,7 +45,7 @@ jobs:
   deploy:
     name: Validate, build and deploy PRE
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     environment: pre
     env:
       AWS_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -134,6 +134,12 @@ jobs:
           printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
           printf 'Tag: %s\nBackend image: %s/aelb-pre-backend:%s\nFrontend image: %s/aelb-pre-frontend:%s\n' \
             "$tag" "$ECR_REGISTRY" "$tag" "$ECR_REGISTRY" "$tag"
+
+      # build-pre.sh usa "--cache-from/--cache-to type=gha"; sin exponer el runtime de Actions
+      # (ACTIONS_RUNTIME_TOKEN / ACTIONS_CACHE_URL) a un paso "run", BuildKit no puede usar la caché.
+      - name: Expose GitHub Actions runtime for Docker cache
+        if: ${{ inputs.image_tag == '' }}
+        uses: crazy-max/ghaction-github-runtime@v4.0.0
 
       - name: Build and push ARM64 images
         if: ${{ inputs.image_tag == '' }}

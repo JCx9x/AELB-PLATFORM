@@ -42,7 +42,7 @@ jobs:
   deploy:
     name: Build and deploy PRE
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 60
     environment: pre
     env:
       AWS_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -90,6 +90,12 @@ jobs:
       - name: Prepare Docker Buildx
         if: ${{ inputs.image_tag == '' }}
         uses: docker/setup-buildx-action@v3.11.1
+
+      # build-pre.sh usa "--cache-from/--cache-to type=gha"; sin exponer el runtime de Actions
+      # (ACTIONS_RUNTIME_TOKEN / ACTIONS_CACHE_URL) a un paso "run", BuildKit no puede usar la caché.
+      - name: Expose GitHub Actions runtime for Docker cache
+        if: ${{ inputs.image_tag == '' }}
+        uses: crazy-max/ghaction-github-runtime@v4.0.0
 
       - name: Build and push ARM64 images
         if: ${{ inputs.image_tag == '' }}

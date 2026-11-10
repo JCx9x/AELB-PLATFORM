@@ -137,7 +137,19 @@ aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS 
 compose=(docker compose -f /opt/aelb/docker-compose.pre.yml)
 "${compose[@]}" config --quiet
 "${compose[@]}" pull
-"${compose[@]}" up -d --remove-orphans
+# Una recreación interrumpida deja contenedores renombrados como "<id>_aelb-pre-backend-1" que
+# bloquean el siguiente "up" con "container name ... is already in use". Se eliminan antes de levantar.
+remove_stale_containers() {
+  docker ps -a --filter label=com.docker.compose.project=aelb-pre --format '{{.ID}} {{.Names}}' |
+    awk '$2 ~ /^[0-9a-f]{12}_/ { print $1 }' | xargs -r docker rm -f
+}
+remove_stale_containers
+if ! "${compose[@]}" up -d --remove-orphans; then
+  echo "docker compose up falló; se recrean backend y frontend desde cero" >&2
+  remove_stale_containers
+  "${compose[@]}" rm -sf backend frontend
+  "${compose[@]}" up -d --remove-orphans
+fi
 
 for service in mysql backend frontend caddy; do
   for attempt in $(seq 1 40); do
