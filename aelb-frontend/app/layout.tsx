@@ -4,6 +4,7 @@ import { Lexend } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import "./globals.css";
+import AelbLogo from "./components/AelbLogo";
 
 const lexend = Lexend({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default async function RootLayout({
             style={{ backgroundColor: 'var(--color-dark)', borderColor: 'rgba(255,255,255,0.08)' }}
           >
             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-5 text-[11px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              <AelbLogo height={28} className="h-7 w-auto" />
               <span>{t("footer", { year: new Date().getFullYear() })}</span>
               <Link href="/privacidad" className="underline hover:text-white">{t("privacy")}</Link>
               <Link href="/cookies" className="underline hover:text-white">{t("cookies")}</Link>

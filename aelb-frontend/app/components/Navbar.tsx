@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { getSession, clearSession, type Session } from '../lib/auth'
 import { logoutUser } from '../lib/api'
 import LanguageSwitcher from './LanguageSwitcher'
+import AelbLogo from './AelbLogo'
 
 const NAV_LINKS = [
   { href: '/',               key: 'inicio' },
@@ -91,7 +92,10 @@ export default function Navbar() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-
+              <Link href="/" className="flex items-center gap-2.5" aria-label="AELB — Inicio">
+                <AelbLogo height={40} priority className="h-9 w-auto lg:h-10" />
+                <span className="hidden sm:block text-white text-sm font-extrabold tracking-widest">AELB</span>
+              </Link>
             </div>
 
             {/* Center: desktop nav */}

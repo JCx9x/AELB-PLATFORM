@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useTranslations, useLocale } from 'next-intl'
 import Navbar from './components/Navbar'
 import ChampionshipPricingSummary from './components/ChampionshipPricingSummary'
+import AelbLogo from './components/AelbLogo'
 import {
   getChampionships,
   getNews,
@@ -55,6 +56,9 @@ export default function HomePage() {
       <section className="relative overflow-hidden flex items-end"
         style={{ backgroundColor: 'var(--color-dark)', minHeight: '20rem' }}>
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a1c1c] via-[#2d1515] to-[#af101a]/40" />
+        <div className="absolute inset-y-0 right-0 hidden lg:flex items-center pr-8 xl:pr-16 pointer-events-none">
+          <AelbLogo height={260} priority className="h-[220px] xl:h-[260px] w-auto drop-shadow-2xl" />
+        </div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-4 lg:px-8 py-12 lg:py-16">
           {loading ? (

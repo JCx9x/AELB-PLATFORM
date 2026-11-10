@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import AelbLogo from '../components/AelbLogo'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { registerUser, loginUser, type ApiError } from '../lib/api'
@@ -72,6 +73,7 @@ export default function RegisterPage() {
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a1c1c] via-[#2a1515] to-[#af101a]/40 pointer-events-none" />
 
         <div className="relative z-10 flex flex-col justify-center flex-1 px-10">
+          <AelbLogo height={110} priority className="mb-8 h-[110px] w-auto self-start" />
           <h1 className="text-white font-extrabold leading-[0.95] tracking-tight mb-6"
             style={{ fontSize: '3rem', letterSpacing: '-0.02em' }}>
             {t('brandLinea1')}<br />{t('brandLinea2')}
