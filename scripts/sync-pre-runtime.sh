@@ -77,6 +77,7 @@ commands=(
   "$(write_file_command scripts/aelb-pre-backup.service /etc/systemd/system/aelb-pre-backup.service 0644)"
   "$(write_file_command scripts/aelb-pre-backup.timer /etc/systemd/system/aelb-pre-backup.timer 0644)"
   "$(write_file_command scripts/deploy-pre.sh /opt/aelb/deploy-pre.sh 0750)"
+  "$(write_file_command scripts/verify-pre.sh /opt/aelb/verify-pre.sh 0750)"
   "$(write_file_command "$runtime_env" /opt/aelb/config/deploy.env 0640)"
   "chown -R root:root /opt/aelb && systemctl daemon-reload"
 )
