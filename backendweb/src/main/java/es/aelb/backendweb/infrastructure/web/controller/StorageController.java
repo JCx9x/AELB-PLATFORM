@@ -32,15 +32,23 @@ public class StorageController {
             @RequestParam String contentType,
             @RequestParam long contentLength
     ) {
-        if (!ALLOWED_FOLDERS.contains(folder) || !ALLOWED_IMAGE_TYPES.contains(contentType)
-                || contentLength <= 0 || contentLength > presignedUrlService.maxUploadBytes()) {
-            return ResponseEntity.badRequest().build();
+        // IllegalArgumentException -> 400 ProblemDetail con "detail", que el panel muestra al usuario.
+        if (!ALLOWED_FOLDERS.contains(folder)) {
+            throw new IllegalArgumentException("Carpeta de subida no permitida");
+        }
+        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+            throw new IllegalArgumentException("Formato de imagen no permitido. Usa JPG, PNG, WebP o GIF.");
+        }
+        if (contentLength <= 0 || contentLength > presignedUrlService.maxUploadBytes()) {
+            throw new IllegalArgumentException("La imagen supera el tamaño máximo de "
+                    + presignedUrlService.maxUploadBytes() / (1024 * 1024) + " MB.");
         }
         String ext = switch (contentType) {
+            case "image/jpeg" -> ".jpg";
             case "image/png"  -> ".png";
             case "image/webp" -> ".webp";
             case "image/gif"  -> ".gif";
-            default           -> throw new IllegalArgumentException("Tipo de imagen no permitido");
+            default           -> throw new IllegalArgumentException("Formato de imagen no permitido. Usa JPG, PNG, WebP o GIF.");
         };
         String key       = folder + "/" + UUID.randomUUID() + ext;
         String uploadUrl = presignedUrlService.generateUploadUrl(key, contentType, contentLength);
