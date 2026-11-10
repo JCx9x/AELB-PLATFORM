@@ -96,7 +96,7 @@ jobs:
         env:
           DOCKER_CACHE_FROM: gha
           DOCKER_CACHE_TO: gha
-        run: ./scripts/build-pre.sh
+        run: bash scripts/build-pre.sh
 
       - name: Sync runtime and deploy through SSM
         id: deploy
@@ -127,7 +127,7 @@ jobs:
             return 1
           }
 
-          sync_id="$(./scripts/sync-pre-runtime.sh)"
+          sync_id="$(bash scripts/sync-pre-runtime.sh)"
           echo "Runtime sync: $sync_id"
           wait_for_ssm "$sync_id"
 
