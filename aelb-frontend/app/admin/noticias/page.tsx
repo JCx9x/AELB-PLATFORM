@@ -47,6 +47,7 @@ export default function NoticiasAdminPage() {
   const [form,      setForm]      = useState<FormState>(EMPTY_FORM)
   const [saving,    setSaving]    = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [imageError,   setImageError]   = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploading,    setUploading]    = useState(false)
 
@@ -81,6 +82,7 @@ export default function NoticiasAdminPage() {
     setForm(EMPTY_FORM)
     setImagePreview(null)
     setFormError(null)
+    setImageError(null)
     setPanelOpen(true)
   }
 
@@ -97,6 +99,7 @@ export default function NoticiasAdminPage() {
     const existingImg = item.imageUrl ?? (item.hasImage ? newsImageUrl(item.id) : null)
     setImagePreview(existingImg)
     setFormError(null)
+    setImageError(null)
     setPanelOpen(true)
   }
 
@@ -105,13 +108,14 @@ export default function NoticiasAdminPage() {
     setEditing(null)
     setImagePreview(null)
     setFormError(null)
+    setImageError(null)
   }
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setFormError(null)
+    setImageError(null)
     try {
       const { uploadUrl, key } = await requestUploadUrl('news', file.type, file.size)
       await uploadToS3(uploadUrl, file)
@@ -120,9 +124,11 @@ export default function NoticiasAdminPage() {
       setImagePreview(URL.createObjectURL(file))
     } catch (err: unknown) {
       const e = err as { detail?: string }
-      setFormError(e.detail ?? t('errorSubirImagen'))
+      setImageError(e.detail ?? t('errorSubirImagen'))
     } finally {
       setUploading(false)
+      // Permite volver a elegir el mismo archivo tras un fallo (si no, el navegador no dispara onChange).
+      e.target.value = ''
     }
   }
 
@@ -389,6 +395,12 @@ export default function NoticiasAdminPage() {
                     <input ref={fileRef} type="file" accept="image/*" className="sr-only"
                       onChange={handleImageChange} disabled={uploading} />
                   </label>
+                )}
+                {imageError && (
+                  <p role="alert" className="mt-2 flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--color-error)' }}>
+                    <ExclamationIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {imageError}
+                  </p>
                 )}
               </div>
 
