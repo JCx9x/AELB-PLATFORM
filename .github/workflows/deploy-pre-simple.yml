@@ -20,15 +20,15 @@ env:
   AWS_REGION: eu-south-2
   ECR_REGISTRY: 537735703239.dkr.ecr.eu-south-2.amazonaws.com
   INSTANCE_ID: i-073035077dc228e14
-  PRE_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
-  DOMAIN_NAME: ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
+  PRE_URL: https://pre.aelb.es
+  DOMAIN_NAME: pre.aelb.es
   FILES_BUCKET: aelb-pre-files-537735703239-eu-south-2
   BACKUPS_BUCKET: aelb-pre-backups-537735703239-eu-south-2
   AELB_PARAMETER_PREFIX: /aelb/pre/
-  CORS_ALLOWED_ORIGINS: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
-  FRONTEND_PUBLIC_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com
-  STRIPE_SUCCESS_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
-  STRIPE_CANCEL_URL: http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled
+  CORS_ALLOWED_ORIGINS: https://pre.aelb.es
+  FRONTEND_PUBLIC_URL: https://pre.aelb.es
+  STRIPE_SUCCESS_URL: https://pre.aelb.es/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}
+  STRIPE_CANCEL_URL: https://pre.aelb.es/perfil?stripe=cancelled
   STRIPE_WEBHOOK_ENABLED: "false"
   EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
   EMAIL_WORKER_ENABLED: ${{ vars.EMAIL_WORKER_ENABLED || 'false' }}
@@ -176,8 +176,8 @@ jobs:
           aws ssm get-command-invocation --region "$AWS_REGION" \
             --command-id "$check_id" --instance-id "$INSTANCE_ID" \
             --query StandardOutputContent --output text
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+          curl --fail --silent --show-error --retry 10 --retry-delay 6 \
             --retry-connrefused --max-time 15 "$PRE_URL/" >/dev/null
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 \
+          curl --fail --silent --show-error --retry 10 --retry-delay 6 \
             --retry-connrefused --max-time 15 "$PRE_URL/api/championships" >/dev/null
           echo "PRE deployment verified: $PRE_URL"

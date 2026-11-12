@@ -102,12 +102,12 @@ BACKUPS_BUCKET="$(cd infra/environments/pre && terraform output -raw backups_buc
 AWS_REGION=eu-south-2 \
 BACKEND_IMAGE="BACKEND_REPOSITORY_URL:COMMIT_SHA" \
 FRONTEND_IMAGE="FRONTEND_REPOSITORY_URL:COMMIT_SHA" \
-CORS_ALLOWED_ORIGINS="http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com" \
-FRONTEND_PUBLIC_URL="http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com" \
-STRIPE_SUCCESS_URL="http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}" \
-STRIPE_CANCEL_URL="http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com/perfil?stripe=cancelled" \
-DOMAIN_NAME="ec2-35-43-130-103.eu-south-2.compute.amazonaws.com" \
-PRE_URL="http://ec2-35-43-130-103.eu-south-2.compute.amazonaws.com" \
+CORS_ALLOWED_ORIGINS="https://pre.aelb.es" \
+FRONTEND_PUBLIC_URL="https://pre.aelb.es" \
+STRIPE_SUCCESS_URL="https://pre.aelb.es/perfil?stripe=success&session_id={CHECKOUT_SESSION_ID}" \
+STRIPE_CANCEL_URL="https://pre.aelb.es/perfil?stripe=cancelled" \
+DOMAIN_NAME="pre.aelb.es" \
+PRE_URL="https://pre.aelb.es" \
 STRIPE_WEBHOOK_ENABLED=false ./scripts/sync-pre-runtime.sh
 ```
 

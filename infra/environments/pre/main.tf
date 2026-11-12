@@ -4,7 +4,7 @@ module "network" {
   environment          = var.environment
   vpc_cidr             = var.vpc_cidr
   public_subnet_cidr   = var.public_subnet_cidr
-  enable_https_ingress = false
+  enable_https_ingress = true
 }
 
 # One log group per container. Docker's awslogs driver only needs to write
@@ -28,6 +28,7 @@ module "storage" {
   aws_region                = var.aws_region
   backup_retention_days     = var.backup_retention_days
   ecr_image_retention_count = var.ecr_image_retention_count
+  files_allowed_origins     = var.files_allowed_origins
 }
 
 module "iam" {

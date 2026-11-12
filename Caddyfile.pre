@@ -1,4 +1,7 @@
-http://{$DOMAIN_NAME} {
+# Con un nombre de dominio (pre.aelb.es) Caddy obtiene y renueva solo el certificado de
+# Let's Encrypt y redirige HTTP→HTTPS; los certificados persisten en el volumen caddy-data.
+# Sin dominio (DOMAIN_NAME=":80", valor por defecto) sirve HTTP plano.
+{$DOMAIN_NAME} {
     encode zstd gzip
 
     # H-10: sin esto, un 502/503/504 de Caddy (p. ej. el backend no responde

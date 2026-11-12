@@ -36,7 +36,12 @@ variable "enable_eip" {
 }
 variable "domain_name" {
   type    = string
-  default = ""
+  default = "pre.aelb.es"
+}
+variable "files_allowed_origins" {
+  type        = list(string)
+  default     = ["https://pre.aelb.es"]
+  description = "Origins allowed to PUT/GET the files bucket directly from the browser (presigned URLs)."
 }
 variable "backup_retention_days" {
   type    = number
