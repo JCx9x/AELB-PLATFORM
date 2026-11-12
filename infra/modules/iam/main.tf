@@ -83,7 +83,7 @@ resource "aws_iam_role_policy" "ec2_app" {
         Sid      = "SendEmailFromVerifiedIdentity"
         Effect   = "Allow"
         Action   = ["ses:SendEmail"]
-        Resource = compact([var.ses_identity_arn, var.ses_recipient_identity_arn])
+        Resource = compact([var.ses_identity_arn, var.ses_recipient_identity_arn, var.ses_domain_identity_arn])
     }])
   })
 }

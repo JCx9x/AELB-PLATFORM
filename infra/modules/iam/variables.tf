@@ -14,4 +14,8 @@ variable "ses_recipient_identity_arn" {
   type    = string
   default = ""
 }
+variable "ses_domain_identity_arn" {
+  type    = string
+  default = ""
+}
 variable "cloudwatch_log_group_arns" { type = list(string) }

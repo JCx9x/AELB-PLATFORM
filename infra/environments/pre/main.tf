@@ -45,6 +45,7 @@ module "iam" {
   github_environment         = var.github_environment
   ses_identity_arn           = aws_ses_email_identity.pre.arn
   ses_recipient_identity_arn = "arn:aws:ses:eu-south-1:${data.aws_caller_identity.current.account_id}:identity/javicanoramirez@gmail.com"
+  ses_domain_identity_arn    = aws_sesv2_email_identity.domain.arn
   # aws_cloudwatch_log_group.arn already includes a trailing ":*" (AWS API behavior) — do not append it again.
   cloudwatch_log_group_arns = [for g in aws_cloudwatch_log_group.app : g.arn]
 }
@@ -52,6 +53,38 @@ module "iam" {
 resource "aws_ses_email_identity" "pre" {
   provider = aws.ses
   email    = var.ses_identity_email
+}
+
+# Dominio remitente (noreply@aelb.es). El DNS vive en LucusHost, junto a la web antigua:
+# los 3 CNAME DKIM deben apuntar a "<token>.dkim.eu-south-1.amazonses.com" (eu-south-1 es
+# región opt-in; el destino global dkim.amazonses.com no existe) y "envios" lleva el MX/SPF de SES.
+# Creado inicialmente con la CLI; los bloques import lo incorporan al estado.
+resource "aws_sesv2_email_identity" "domain" {
+  provider       = aws.ses
+  email_identity = var.ses_domain
+
+  dkim_signing_attributes {
+    next_signing_key_length = "RSA_2048_BIT"
+  }
+}
+
+resource "aws_sesv2_email_identity_mail_from_attributes" "domain" {
+  provider               = aws.ses
+  email_identity         = aws_sesv2_email_identity.domain.email_identity
+  mail_from_domain       = "envios.${var.ses_domain}"
+  behavior_on_mx_failure = "USE_DEFAULT_VALUE"
+}
+
+import {
+  provider = aws.ses
+  to       = aws_sesv2_email_identity.domain
+  id       = "aelb.es"
+}
+
+import {
+  provider = aws.ses
+  to       = aws_sesv2_email_identity_mail_from_attributes.domain
+  id       = "aelb.es"
 }
 
 module "compute" {

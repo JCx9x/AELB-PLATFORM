@@ -77,6 +77,11 @@ variable "ses_identity_arn" {
   default     = ""
   description = "Optional verified SES identity ARN for transactional email."
 }
+variable "ses_domain" {
+  type        = string
+  default     = "aelb.es"
+  description = "Domain verified in SES (eu-south-1) used as sender, e.g. noreply@aelb.es."
+}
 variable "ses_identity_email" {
   type        = string
   default     = "javiercanoramirez@gmail.com"

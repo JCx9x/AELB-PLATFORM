@@ -82,7 +82,7 @@ EMAIL_ENABLED=true
 EMAIL_WORKER_ENABLED=true
 ```
 
-El workflow ya aporta `EMAIL_PROVIDER=ses`, `EMAIL_FROM=javiercanoramirez@gmail.com`, `EMAIL_FROM_NAME=AELB · Asociación Española de Lucha de Brazos` y `EMAIL_SES_REGION=eu-south-1`.
+El workflow ya aporta `EMAIL_PROVIDER=ses`, `EMAIL_FROM=noreply@aelb.es`, `EMAIL_FROM_NAME=AELB · Asociación Española de Lucha de Brazos` y `EMAIL_SES_REGION=eu-south-1`.
 
 El cifrado AES/GCM de los payloads de la outbox necesita una clave independiente. Créala manualmente como SecureString (no la guardes en Git ni Terraform):
 
