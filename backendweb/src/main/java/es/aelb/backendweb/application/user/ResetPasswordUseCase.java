@@ -1,6 +1,7 @@
 package es.aelb.backendweb.application.user;
 
 import es.aelb.backendweb.domain.user.User;
+import es.aelb.backendweb.domain.user.valueobject.PasswordPolicy;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
 import es.aelb.backendweb.infrastructure.email.EmailServiceAdapter;
@@ -15,6 +16,8 @@ public class ResetPasswordUseCase {
     public ResetPasswordUseCase(SpringPasswordResetTokenJpaRepository tokens, UserRepository users, PasswordEncoder encoder) { this.tokens=tokens;this.users=users;this.encoder=encoder; }
     @Transactional public void execute(String token, String newPassword) {
         if (token == null || token.isBlank()) throw new InvalidResetTokenException();
+        // Antes de tocar el token: una contraseña débil no debe consumir el enlace.
+        PasswordPolicy.validate(newPassword);
         PasswordResetTokenJpaEntity t=tokens.findByTokenHash(EmailServiceAdapter.hash(token)).orElseThrow(InvalidResetTokenException::new);
         if (t.isUsed() || t.getExpiresAt().isBefore(LocalDateTime.now())) throw new InvalidResetTokenException();
         User user=users.findById(UserId.of(t.getUserId())).orElseThrow(InvalidResetTokenException::new);

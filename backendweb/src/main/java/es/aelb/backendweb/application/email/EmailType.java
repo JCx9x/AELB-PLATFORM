@@ -3,6 +3,8 @@ package es.aelb.backendweb.application.email;
 public enum EmailType {
     EMAIL_VERIFICATION,
     PASSWORD_RESET,
+    PASSWORD_RESET_RECOVERY,
+    RECOVERY_EMAIL_VERIFICATION,
     REGISTRATION_CONFIRMATION,
     PAYMENT_CONFIRMATION
 }

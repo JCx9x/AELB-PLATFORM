@@ -5,6 +5,7 @@ import es.aelb.backendweb.domain.user.User;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.Dni;
 import es.aelb.backendweb.domain.user.valueobject.Email;
+import es.aelb.backendweb.domain.user.valueobject.PasswordPolicy;
 import es.aelb.backendweb.domain.shared.exception.DomainException;
 import es.aelb.backendweb.application.email.EmailService;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class CreateUserUseCase implements UseCase<CreateUserCommand, String> {
     public String execute(CreateUserCommand cmd) {
         Email email = Email.of(cmd.email());
         Dni   dni   = Dni.of(cmd.dni());
+        PasswordPolicy.validate(cmd.rawPassword());
 
         if (userRepository.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(email.value());

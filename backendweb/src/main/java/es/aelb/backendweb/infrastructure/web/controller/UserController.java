@@ -11,6 +11,7 @@ import es.aelb.backendweb.application.user.ManagementUpdateProfileCommand;
 import es.aelb.backendweb.application.user.ManagementUpdateProfileUseCase;
 import es.aelb.backendweb.application.user.UpdateProfileCommand;
 import es.aelb.backendweb.application.user.UpdateProfileUseCase;
+import es.aelb.backendweb.application.user.UpdateRecoveryEmailUseCase;
 import es.aelb.backendweb.domain.user.User;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
@@ -20,6 +21,7 @@ import es.aelb.backendweb.infrastructure.web.dto.request.ChangePasswordRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.ManagementUpdateUserRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateProfileRequest;
+import es.aelb.backendweb.infrastructure.web.dto.request.UpdateRecoveryEmailRequest;
 import es.aelb.backendweb.infrastructure.web.dto.response.UserResponse;
 import es.aelb.backendweb.infrastructure.web.dto.response.PagedResponse;
 import es.aelb.backendweb.infrastructure.web.Pagination;
@@ -48,6 +50,7 @@ public class UserController {
     private final DeleteUserUseCase     deleteUserUseCase;
     private final UserRepository        userRepository;
     private final QuotaRepository       quotaRepository;
+    private final UpdateRecoveryEmailUseCase updateRecoveryEmailUseCase;
 
     public UserController(
             CreateUserUseCase createUserUseCase,
@@ -57,7 +60,8 @@ public class UserController {
             ChangePasswordUseCase changePasswordUseCase,
             DeleteUserUseCase deleteUserUseCase,
             UserRepository userRepository,
-            QuotaRepository quotaRepository
+            QuotaRepository quotaRepository,
+            UpdateRecoveryEmailUseCase updateRecoveryEmailUseCase
     ) {
         this.createUserUseCase     = createUserUseCase;
         this.updateProfileUseCase  = updateProfileUseCase;
@@ -67,6 +71,7 @@ public class UserController {
         this.deleteUserUseCase     = deleteUserUseCase;
         this.userRepository        = userRepository;
         this.quotaRepository       = quotaRepository;
+        this.updateRecoveryEmailUseCase = updateRecoveryEmailUseCase;
     }
 
     @PostMapping
@@ -166,6 +171,22 @@ public class UserController {
                 new UpdateProfileCommand(id, req.firstName(), req.lastName(), req.phone())
         );
         return ResponseEntity.ok(UserResponse.from(updated));
+    }
+
+    /**
+     * Correo secundario para recuperar la contraseña. Solo lo gestiona el propio
+     * usuario (ni siquiera un ADMIN): da acceso a restablecer su contraseña.
+     */
+    @PutMapping("/{id}/recovery-email")
+    public ResponseEntity<UserResponse> updateRecoveryEmail(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateRecoveryEmailRequest req,
+            Authentication authentication
+    ) {
+        if (!id.equals(authentication.getPrincipal())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(UserResponse.from(updateRecoveryEmailUseCase.execute(id, req.recoveryEmail())));
     }
 
     // ── Admin: full update (profile + role + blocked) ─────────────────────────

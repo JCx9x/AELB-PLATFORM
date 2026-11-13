@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { resetPassword, type ApiError } from '../lib/api'
+import { isPasswordValid } from '../lib/passwordPolicy'
+import PasswordRequirements from '../components/PasswordRequirements'
 
 function ResetPasswordForm() {
   const t = useTranslations('ResetPassword')
@@ -28,7 +30,7 @@ function ResetPasswordForm() {
     e.preventDefault()
     setFieldError(null)
 
-    if (password.length < 8) {
+    if (!isPasswordValid(password)) {
       setFieldError(t('errorPasswordMinimo'))
       return
     }
@@ -85,7 +87,7 @@ function ResetPasswordForm() {
         </div>
 
         <div className="relative z-10 px-10 py-6 border-t border-white/10">
-          <p className="text-white/30 text-xs">{t('copyright')}</p>
+          <p className="text-white/30 text-xs">{t('copyright', { year: new Date().getFullYear() })}</p>
         </div>
       </div>
 
@@ -204,9 +206,7 @@ function ResetPasswordForm() {
                         {showPassword ? <EyeOffIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                       </button>
                     </div>
-                    <p id="reset-password-hint" className="text-[11px] mt-1.5" style={{ color: 'var(--color-outline)' }}>
-                      {t('minimo8Caracteres')}
-                    </p>
+                    <PasswordRequirements id="reset-password-hint" password={password} />
                   </div>
 
                   <div>
@@ -273,7 +273,7 @@ function ResetPasswordForm() {
           borderColor: 'var(--color-outline-variant)',
         }}>
           <p className="text-center text-[11px]" style={{ color: 'var(--color-outline)' }}>
-            {t('copyright')}
+            {t('copyright', { year: new Date().getFullYear() })}
             {' · '}<Link href="/privacy" className="hover:underline">{t('privacidad')}</Link>
             {' · '}<Link href="/terms" className="hover:underline">{t('terminos')}</Link>
           </p>

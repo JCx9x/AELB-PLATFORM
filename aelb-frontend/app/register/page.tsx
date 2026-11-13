@@ -3,14 +3,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import AelbLogo from '../components/AelbLogo'
-import { useRouter } from 'next/navigation'
+import PasswordRequirements from '../components/PasswordRequirements'
 import { useTranslations } from 'next-intl'
-import { registerUser, loginUser, type ApiError } from '../lib/api'
-import { saveSession } from '../lib/auth'
+import { registerUser, resendVerificationByEmail, type ApiError } from '../lib/api'
+import { isPasswordValid } from '../lib/passwordPolicy'
 
 export default function RegisterPage() {
   const t      = useTranslations('Register')
-  const router = useRouter()
 
   const nationalities = t.raw('nacionalidades') as Record<string, string>
 
@@ -31,12 +30,19 @@ export default function RegisterPage() {
 
   const [error, setError]     = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Email al que se envió la verificación: si está fijado, la cuenta ya existe y se muestra
+  // la pantalla de "revisa tu correo" en lugar del formulario.
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     // Client-side checks
+    if (!isPasswordValid(password)) {
+      setError(t('errorPasswordDebil'))
+      return
+    }
     if (password !== confirm) {
       setError(t('errorPasswordsNoCoinciden'))
       return
@@ -52,10 +58,9 @@ export default function RegisterPage() {
         email, password, firstName, lastName, dni, phone,
         city, province: province.trim() || null, nationality, birthDate,
       })
-      // Auto-login tras registro exitoso
-      const auth = await loginUser(email, password)
-      saveSession(auth)
-      router.push('/')
+      // Sin login automático: el backend exige verificar el email antes de iniciar sesión.
+      setRegisteredEmail(email)
+      window.scrollTo({ top: 0 })
     } catch (err) {
       const apiErr = err as ApiError
       setError(apiErr.detail ?? t('errorCrearCuenta'))
@@ -96,7 +101,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="relative z-10 px-10 py-6 border-t border-white/10">
-          <p className="text-white/30 text-xs">{t('copyright')}</p>
+          <p className="text-white/30 text-xs">{t('copyright', { year: new Date().getFullYear() })}</p>
         </div>
       </div>
 
@@ -114,6 +119,7 @@ export default function RegisterPage() {
         <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-16 xl:px-20 overflow-y-auto"
           style={{ backgroundColor: 'var(--color-surface-card)' }}>
           <div className="w-full max-w-md mx-auto">
+            {registeredEmail ? <VerificationPending email={registeredEmail} /> : (<>
 
             <div className="mb-8">
               <h2 className="font-bold mb-1"
@@ -213,6 +219,7 @@ export default function RegisterPage() {
                   onToggle={() => setShowPassword((v) => !v)}
                   placeholder={t('placeholderContrasena')} autoComplete="new-password"
                   value={password} onChange={(e) => setPassword(e.target.value)} />
+                <PasswordRequirements password={password} />
               </Field>
 
               {/* Confirm */}
@@ -259,6 +266,7 @@ export default function RegisterPage() {
                 {t('iniciaSesion')}
               </Link>
             </p>
+            </>)}
           </div>
         </div>
 
@@ -268,12 +276,81 @@ export default function RegisterPage() {
           borderColor: 'var(--color-outline-variant)',
         }}>
           <p className="text-center text-[11px]" style={{ color: 'var(--color-outline)' }}>
-            {t('copyright')}
+            {t('copyright', { year: new Date().getFullYear() })}
             {' · '}<Link href="/privacy" className="hover:underline">{t('privacidad')}</Link>
             {' · '}<Link href="/terms" className="hover:underline">{t('terminos')}</Link>
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Cuenta creada, pendiente de verificar ─────────────────────────────────────
+function VerificationPending({ email }: { email: string }) {
+  const t = useTranslations('Register')
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+
+  async function handleResend() {
+    setResendState('sending')
+    try {
+      await resendVerificationByEmail(email)
+      setResendState('sent')
+    } catch {
+      setResendState('error')
+    }
+  }
+
+  return (
+    <div aria-live="polite">
+      <div className="flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+          style={{ backgroundColor: 'rgba(211,47,47,0.1)' }}>
+          <MailIcon className="w-8 h-8" />
+        </div>
+        <p className="text-[11px] font-bold uppercase tracking-widest mb-2"
+          style={{ color: 'var(--color-primary-cta)' }}>
+          {t('verificaEyebrow')}
+        </p>
+        <h2 className="font-bold mb-4"
+          style={{ fontSize: '1.75rem', color: 'var(--color-on-surface)', letterSpacing: '-0.01em' }}>
+          {t('verificaTitulo')}
+        </h2>
+        <p className="text-base leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
+          {t('verificaTexto')}{' '}
+          <strong className="break-all" style={{ color: 'var(--color-on-surface)' }}>{email}</strong>
+        </p>
+      </div>
+
+      <div className="mt-6 px-4 py-4 rounded-[0.25rem] text-sm leading-relaxed space-y-2"
+        style={{ backgroundColor: 'var(--color-surface)', borderLeft: '3px solid var(--color-primary-cta)', color: 'var(--color-on-surface-variant)' }}>
+        <p>{t('verificaInstrucciones')}</p>
+        <p>{t('verificaCaduca')}</p>
+      </div>
+
+      <div className="mt-6 text-center text-sm" style={{ color: 'var(--color-on-surface-variant)' }}>
+        {resendState === 'sent' ? (
+          <p role="status" style={{ color: '#15803d' }}>{t('reenviado')}</p>
+        ) : (
+          <p>
+            {t('verificaNoLlega')}{' '}
+            <button type="button" onClick={handleResend} disabled={resendState === 'sending'}
+              className="font-bold transition-opacity hover:opacity-70 disabled:opacity-60"
+              style={{ color: 'var(--color-primary)' }}>
+              {resendState === 'sending' ? t('reenviando') : t('reenviarCorreo')}
+            </button>
+          </p>
+        )}
+        {resendState === 'error' && (
+          <p role="alert" className="mt-2" style={{ color: 'var(--color-error)' }}>{t('errorReenviar')}</p>
+        )}
+      </div>
+
+      <Link href="/login"
+        className="mt-8 w-full py-4 text-sm font-bold uppercase tracking-widest text-white rounded-[0.25rem] flex items-center justify-center transition-colors"
+        style={{ backgroundColor: 'var(--color-primary-cta)' }}>
+        {t('irALogin')}
+      </Link>
     </div>
   )
 }
@@ -367,6 +444,15 @@ function SpinnerIcon({ className }: { className?: string }) {
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor"
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  )
+}
+
+function MailIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="var(--color-primary-cta)" strokeWidth={1.8} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round"
+        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
     </svg>
   )
 }

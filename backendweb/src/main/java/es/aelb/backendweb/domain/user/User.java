@@ -29,6 +29,8 @@ public class User extends AggregateRoot<UserId> {
     private       UserRole      role;
     private       boolean       blocked;
     private       boolean       emailVerified;
+    private       Email         recoveryEmail;          // opcional
+    private       boolean       recoveryEmailVerified;
     private       String        teamId;
     private       int           tokenVersion;
     private final LocalDateTime createdAt;
@@ -96,13 +98,17 @@ public class User extends AggregateRoot<UserId> {
             String firstName, String lastName, Dni dni,
             String phone, String city, String province, String nationality,
             LocalDate birthDate, UserRole role,
-            boolean blocked, boolean emailVerified, String teamId, int tokenVersion,
+            boolean blocked, boolean emailVerified,
+            Email recoveryEmail, boolean recoveryEmailVerified,
+            String teamId, int tokenVersion,
             LocalDateTime createdAt, LocalDateTime updatedAt
     ) {
         User user = new User(id, email, passwordHash, firstName, lastName,
                 dni, phone, city, province, nationality, birthDate, role, tokenVersion, createdAt);
         user.blocked   = blocked;
         user.emailVerified = emailVerified;
+        user.recoveryEmail = recoveryEmail;
+        user.recoveryEmailVerified = recoveryEmail != null && recoveryEmailVerified;
         user.teamId    = teamId;
         user.updatedAt = updatedAt;
         return user;
@@ -191,6 +197,43 @@ public class User extends AggregateRoot<UserId> {
     public boolean isEmailVerified() { return emailVerified; }
     public void verifyEmail() { this.emailVerified = true; this.updatedAt = LocalDateTime.now(); }
 
+    /**
+     * Establece el correo secundario de recuperación. Queda pendiente de verificar
+     * salvo que sea exactamente el mismo que ya estaba verificado.
+     */
+    public void changeRecoveryEmail(Email newRecoveryEmail) {
+        if (newRecoveryEmail == null) {
+            removeRecoveryEmail();
+            return;
+        }
+        if (newRecoveryEmail.equals(this.email)) {
+            throw new RecoveryEmailSameAsPrimaryException();
+        }
+        if (newRecoveryEmail.equals(this.recoveryEmail)) return;
+        this.recoveryEmail         = newRecoveryEmail;
+        this.recoveryEmailVerified = false;
+        this.updatedAt             = LocalDateTime.now();
+    }
+
+    public void removeRecoveryEmail() {
+        this.recoveryEmail         = null;
+        this.recoveryEmailVerified = false;
+        this.updatedAt             = LocalDateTime.now();
+    }
+
+    /**
+     * Marca como verificado el correo secundario, solo si sigue siendo el mismo
+     * para el que se emitió el enlace (el usuario pudo cambiarlo entretanto).
+     */
+    public boolean verifyRecoveryEmail(Email verifiedAddress) {
+        if (this.recoveryEmail == null || !this.recoveryEmail.equals(verifiedAddress)) return false;
+        this.recoveryEmailVerified = true;
+        this.updatedAt             = LocalDateTime.now();
+        return true;
+    }
+
+    public boolean hasPendingRecoveryEmail() { return recoveryEmail != null && !recoveryEmailVerified; }
+
     private static void validateName(String name, String field) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("El " + field + " no puede estar vacío");
@@ -221,6 +264,8 @@ public class User extends AggregateRoot<UserId> {
     public UserRole      getRole()         { return role; }
     public boolean       isBlocked()       { return blocked; }
     public String        getTeamId()       { return teamId; }
+    public Email         getRecoveryEmail() { return recoveryEmail; }
+    public boolean       isRecoveryEmailVerified() { return recoveryEmailVerified; }
     public int           getTokenVersion() { return tokenVersion; }
     public LocalDateTime getCreatedAt()    { return createdAt; }
     public LocalDateTime getUpdatedAt()    { return updatedAt; }
@@ -240,6 +285,12 @@ public class User extends AggregateRoot<UserId> {
     public static final class UserBlockedException extends DomainException {
         public UserBlockedException(String userId) {
             super("El usuario " + userId + " está bloqueado y no puede realizar esta acción");
+        }
+    }
+
+    public static final class RecoveryEmailSameAsPrimaryException extends DomainException {
+        public RecoveryEmailSameAsPrimaryException() {
+            super("El correo de recuperación debe ser distinto de tu correo principal");
         }
     }
 

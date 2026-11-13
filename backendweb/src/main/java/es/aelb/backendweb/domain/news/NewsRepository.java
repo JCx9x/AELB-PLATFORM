@@ -14,5 +14,7 @@ public interface NewsRepository {
     List<News>         findAll();
     List<News>         findPublished();
     PageResult<News> findPage(int page, int size, boolean publishedOnly);
+    /** Same as {@link #findPage} but filtered by a case-insensitive text match on title or content. */
+    PageResult<News> search(String query, int page, int size, boolean publishedOnly);
     void               delete(NewsId id);
 }

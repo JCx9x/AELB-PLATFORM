@@ -32,6 +32,8 @@ public class UserJpaMapper {
         entity.setRole(RoleJpa.valueOf(user.getRole().name()));
         entity.setBlocked(user.isBlocked());
         entity.setEmailVerified(user.isEmailVerified());
+        entity.setRecoveryEmail(user.getRecoveryEmail() == null ? null : user.getRecoveryEmail().value());
+        entity.setRecoveryEmailVerified(user.isRecoveryEmailVerified());
         entity.setTeamId(user.getTeamId());
         entity.setTokenVersion(user.getTokenVersion());
         entity.setCreatedAt(user.getCreatedAt());
@@ -55,6 +57,8 @@ public class UserJpaMapper {
                 UserRole.valueOf(entity.getRole().name()),
                 entity.isBlocked(),
                 entity.isEmailVerified(),
+                entity.getRecoveryEmail() == null ? null : Email.of(entity.getRecoveryEmail()),
+                entity.isRecoveryEmailVerified(),
                 entity.getTeamId(),
                 entity.getTokenVersion(),
                 entity.getCreatedAt(),

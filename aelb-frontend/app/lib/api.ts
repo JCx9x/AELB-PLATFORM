@@ -66,6 +66,8 @@ export interface UserProfile {
   role:        string
   blocked:     boolean
   emailVerified: boolean
+  recoveryEmail: string | null
+  recoveryEmailVerified: boolean
   teamId:      string | null
   createdAt:   string
 }
@@ -232,9 +234,10 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
   return response.json()
 }
 
-export async function forgotPassword(email: string): Promise<{ message: string }> {
+/** {@code useRecoveryEmail}: `email` es el correo secundario de recuperación (el enlace se envía ahí). */
+export async function forgotPassword(email: string, useRecoveryEmail = false): Promise<{ message: string }> {
   const headers = await getCsrfHeaders()
-  const response = await fetch(`${BASE_URL}/api/auth/password/forgot`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ email }) })
+  const response = await fetch(`${BASE_URL}/api/auth/password/forgot`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ email, useRecoveryEmail }) })
   if (!response.ok) throw await parseError(response)
   return response.json()
 }
@@ -249,6 +252,23 @@ export async function verifyEmail(token: string): Promise<void> {
   const headers = await getCsrfHeaders()
   const response = await fetch(`${BASE_URL}/api/auth/email/verify`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ token }) })
   if (!response.ok) throw await parseError(response)
+}
+
+export async function verifyRecoveryEmail(token: string): Promise<void> {
+  const headers = await getCsrfHeaders()
+  const response = await fetch(`${BASE_URL}/api/auth/recovery-email/verify`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ token }) })
+  if (!response.ok) throw await parseError(response)
+}
+
+/** Añade/cambia (y envía el correo de verificación) o, con null, quita el correo de recuperación. */
+export async function updateRecoveryEmail(userId: string, recoveryEmail: string | null): Promise<UserProfile> {
+  const response = await fetchWithAuth(`/api/users/${userId}/recovery-email`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recoveryEmail }),
+  })
+  if (!response.ok) throw await parseError(response)
+  return response.json()
 }
 
 export async function resendVerification(): Promise<{ message: string }> {
@@ -363,8 +383,10 @@ export interface NewsData {
   published:   boolean
 }
 
-export async function getNews(page = 0, size = 25): Promise<Paged<NewsItem>> {
-  const response = await fetch(`${BASE_URL}/api/news?page=${page}&size=${size}`)
+export async function getNews(page = 0, size = 25, query?: string): Promise<Paged<NewsItem>> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) })
+  if (query?.trim()) params.set('q', query.trim())
+  const response = await fetch(`${BASE_URL}/api/news?${params}`)
   if (!response.ok) throw await parseError(response)
   return response.json()
 }

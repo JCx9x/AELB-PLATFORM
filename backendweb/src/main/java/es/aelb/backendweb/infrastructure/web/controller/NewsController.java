@@ -8,6 +8,7 @@ import es.aelb.backendweb.application.news.UpdateNewsUseCase;
 import es.aelb.backendweb.domain.news.News;
 import es.aelb.backendweb.domain.news.NewsRepository;
 import es.aelb.backendweb.domain.news.valueobject.NewsId;
+import es.aelb.backendweb.domain.shared.pagination.PageResult;
 import es.aelb.backendweb.infrastructure.storage.PresignedUrlService;
 import es.aelb.backendweb.infrastructure.web.dto.request.CreateNewsRequest;
 import es.aelb.backendweb.infrastructure.web.dto.request.UpdateNewsRequest;
@@ -50,15 +51,22 @@ public class NewsController {
     }
 
     @GetMapping
-    public ResponseEntity<PagedResponse<NewsResponse>> findPublished(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
-        Pagination pagination = Pagination.of(page, size);
-        return ResponseEntity.ok(PagedResponse.from(newsRepository.findPage(pagination.page(), pagination.size(), true), this::toResponse));
+    public ResponseEntity<PagedResponse<NewsResponse>> findPublished(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size, @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(PagedResponse.from(findNews(page, size, q, true), this::toResponse));
     }
 
     @GetMapping("/all")
-    public ResponseEntity<PagedResponse<NewsResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+    public ResponseEntity<PagedResponse<NewsResponse>> findAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size, @RequestParam(required = false) String q) {
+        return ResponseEntity.ok(PagedResponse.from(findNews(page, size, q, false), this::toResponse));
+    }
+
+    private PageResult<News> findNews(int page, int size, String q, boolean publishedOnly) {
         Pagination pagination = Pagination.of(page, size);
-        return ResponseEntity.ok(PagedResponse.from(newsRepository.findPage(pagination.page(), pagination.size(), false), this::toResponse));
+        if (q == null || q.isBlank()) {
+            return newsRepository.findPage(pagination.page(), pagination.size(), publishedOnly);
+        }
+        String query = q.length() > 100 ? q.substring(0, 100) : q;
+        return newsRepository.search(query, pagination.page(), pagination.size(), publishedOnly);
     }
 
     @GetMapping("/{id}")

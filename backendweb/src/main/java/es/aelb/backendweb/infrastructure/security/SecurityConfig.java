@@ -86,7 +86,7 @@ public class SecurityConfig {
 
                         // ── Auth y registro ──────────────────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/password/forgot", "/api/auth/password/reset", "/api/auth/email/verify").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password/forgot", "/api/auth/password/reset", "/api/auth/email/verify", "/api/auth/recovery-email/verify").permitAll()
                         // Una cuenta sin verificar no puede iniciar sesión (LoginUseCase), así
                         // que este endpoint debe ser alcanzable sin sesión — igual que
                         // password/forgot. El controlador identifica por sesión si la hay,

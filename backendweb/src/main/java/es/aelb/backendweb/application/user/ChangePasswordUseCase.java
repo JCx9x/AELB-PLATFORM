@@ -1,6 +1,7 @@
 package es.aelb.backendweb.application.user;
 
 import es.aelb.backendweb.domain.shared.exception.DomainException;
+import es.aelb.backendweb.domain.user.valueobject.PasswordPolicy;
 import es.aelb.backendweb.domain.user.User;
 import es.aelb.backendweb.domain.user.UserRepository;
 import es.aelb.backendweb.domain.user.valueobject.UserId;
@@ -37,6 +38,7 @@ public class ChangePasswordUseCase {
             throw new WrongCurrentPasswordException();
         }
 
+        PasswordPolicy.validate(cmd.newPassword());
         user.changePassword(passwordEncoder.encode(cmd.newPassword()));
         userRepository.save(user);
     }

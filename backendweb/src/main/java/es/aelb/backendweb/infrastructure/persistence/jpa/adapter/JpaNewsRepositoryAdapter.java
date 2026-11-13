@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Component
@@ -53,6 +54,18 @@ public class JpaNewsRepositoryAdapter implements NewsRepository {
     @Override public PageResult<News> findPage(int page, int size, boolean publishedOnly) {
         var result = publishedOnly ? jpaRepository.findByPublishedTrueOrderByPublishedAtDesc(PageRequest.of(page, size)) : jpaRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
         return new PageResult<>(result.getContent().stream().map(NewsJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
+    }
+
+    @Override
+    public PageResult<News> search(String query, int page, int size, boolean publishedOnly) {
+        String pattern = "%" + escapeLike(query.trim().toLowerCase(Locale.ROOT)) + "%";
+        PageRequest pageable = PageRequest.of(page, size);
+        var result = publishedOnly ? jpaRepository.searchPublished(pattern, pageable) : jpaRepository.searchAll(pattern, pageable);
+        return new PageResult<>(result.getContent().stream().map(NewsJpaMapper::toDomain).toList(), page, size, result.getTotalElements(), result.getTotalPages());
+    }
+
+    private static String escapeLike(String value) {
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     @Override

@@ -17,8 +17,8 @@ import java.nio.charset.StandardCharsets; import java.security.*; import java.ti
 public class EmailServiceAdapter implements EmailService {
  private static final Logger log = LoggerFactory.getLogger(EmailServiceAdapter.class);
  private final UserRepository users; private final SpringEmailOutboxJpaRepository outbox; private final SpringPasswordResetTokenJpaRepository resets; private final SpringEmailVerificationTokenJpaRepository verifications; private final EmailProperties props; private final EmailPayloadCrypto crypto; private final ObjectMapper mapper; private final SecureRandom random = new SecureRandom();
- private final SpringUserJpaRepository lockedUsers;
- public EmailServiceAdapter(UserRepository users, SpringEmailOutboxJpaRepository outbox, SpringPasswordResetTokenJpaRepository resets, SpringEmailVerificationTokenJpaRepository verifications, EmailProperties props, EmailPayloadCrypto crypto, ObjectMapper mapper, SpringUserJpaRepository lockedUsers) { this.users=users;this.outbox=outbox;this.resets=resets;this.verifications=verifications;this.props=props;this.crypto=crypto;this.mapper=mapper;this.lockedUsers=lockedUsers; }
+ private final SpringUserJpaRepository lockedUsers; private final SpringRecoveryEmailVerificationTokenJpaRepository recoveryVerifications;
+ public EmailServiceAdapter(UserRepository users, SpringEmailOutboxJpaRepository outbox, SpringPasswordResetTokenJpaRepository resets, SpringEmailVerificationTokenJpaRepository verifications, EmailProperties props, EmailPayloadCrypto crypto, ObjectMapper mapper, SpringUserJpaRepository lockedUsers, SpringRecoveryEmailVerificationTokenJpaRepository recoveryVerifications) { this.users=users;this.outbox=outbox;this.resets=resets;this.verifications=verifications;this.props=props;this.crypto=crypto;this.mapper=mapper;this.lockedUsers=lockedUsers;this.recoveryVerifications=recoveryVerifications; }
  @Override @Transactional public void requestEmailVerification(User user) {
    if (!props.isEnabled()) return;
    if (user.isEmailVerified()) return; String id=user.getId().value(); lockedUsers.findByIdForUpdate(id); LocalDateTime now=LocalDateTime.now();
@@ -29,12 +29,35 @@ public class EmailServiceAdapter implements EmailService {
  }
  @Override @Transactional public void requestPasswordReset(String email) {
    if (!props.isEnabled()) return;
-   Optional<User> found=users.findByEmail(Email.of(email)); if (found.isEmpty()) { random.nextBytes(new byte[32]); return; }
-   User user=found.get(); String id=user.getId().value(); lockedUsers.findByIdForUpdate(id); LocalDateTime now=LocalDateTime.now();
+   Optional<User> found=parse(email).flatMap(users::findByEmail); if (found.isEmpty()) { random.nextBytes(new byte[32]); return; }
+   User user=found.get(); issuePasswordReset(user, EmailType.PASSWORD_RESET, user.getEmail().value());
+ }
+ /** El correo secundario puede compartirse entre varias cuentas (p. ej. de una familia): se envía un enlace por cada una. */
+ @Override @Transactional public void requestPasswordResetViaRecoveryEmail(String recoveryEmail) {
+   if (!props.isEnabled()) return;
+   Optional<Email> address=parse(recoveryEmail); if (address.isEmpty()) return;
+   List<User> accounts=users.findByVerifiedRecoveryEmail(address.get()); if (accounts.isEmpty()) { random.nextBytes(new byte[32]); return; }
+   for (User user : accounts) issuePasswordReset(user, EmailType.PASSWORD_RESET_RECOVERY, address.get().value());
+ }
+ private void issuePasswordReset(User user, EmailType type, String recipient) {
+   String id=user.getId().value(); lockedUsers.findByIdForUpdate(id); LocalDateTime now=LocalDateTime.now();
    if (resets.existsByUserIdAndCreatedAtAfter(id, now.minusSeconds(props.getPasswordResetCooldownSeconds())) || resets.countByUserIdAndCreatedAtAfter(id, now.minusHours(1)) >= props.getPasswordResetMaxPerHour()) return;
    resets.deleteByUserId(id); String token=token(); PasswordResetTokenJpaEntity t=new PasswordResetTokenJpaEntity();t.setUserId(id);t.setTokenHash(hash(token));t.setExpiresAt(now.plusMinutes(props.getPasswordResetTokenExpirationMinutes()));t.setCreatedAt(now);t.setUsed(false);resets.save(t);
-   enqueue(EmailType.PASSWORD_RESET,user.getEmail().value(),"PASSWORD_RESET:"+id+":"+now.toEpochSecond(ZoneOffset.UTC), tokenPayload(token,user.getFirstName(),"reset-password"));
+   Map<String,String> payload=new HashMap<>(Map.of("token",token,"name",user.getFirstName(),"path","reset-password"));
+   // Quien recupera por el correo secundario suele no recordar el principal: se lo recordamos.
+   if (type==EmailType.PASSWORD_RESET_RECOVERY) payload.put("accountEmail",user.getEmail().value());
+   enqueue(type,recipient,type.name()+":"+id+":"+now.toEpochSecond(ZoneOffset.UTC), payload(payload));
  }
+ @Override @Transactional public void requestRecoveryEmailVerification(User user) {
+   if (!props.isEnabled()) return;
+   if (!user.hasPendingRecoveryEmail()) return; String id=user.getId().value(); String address=user.getRecoveryEmail().value(); lockedUsers.findByIdForUpdate(id); LocalDateTime now=LocalDateTime.now();
+   // El cooldown es por dirección: corregir una errata justo después debe enviar el correo a la nueva.
+   if (recoveryVerifications.existsByUserIdAndRecoveryEmailAndCreatedAtAfter(id, address, now.minusSeconds(props.getEmailVerificationCooldownSeconds()))) return;
+   if (recoveryVerifications.countByUserIdAndCreatedAtAfter(id, now.minusHours(1)) >= props.getEmailVerificationMaxPerHour()) return;
+   recoveryVerifications.deleteByUserId(id); String token=token(); RecoveryEmailVerificationTokenJpaEntity t=new RecoveryEmailVerificationTokenJpaEntity(); t.setUserId(id);t.setRecoveryEmail(address);t.setTokenHash(hash(token));t.setExpiresAt(now.plusHours(props.getEmailVerificationTokenExpirationHours()));t.setCreatedAt(now);t.setUsed(false);recoveryVerifications.save(t);
+   enqueue(EmailType.RECOVERY_EMAIL_VERIFICATION,address,"RECOVERY_EMAIL_VERIFICATION:"+id+":"+hash(address).substring(0,16)+":"+now.toEpochSecond(ZoneOffset.UTC), payload(Map.of("token",token,"name",user.getFirstName(),"accountEmail",user.getEmail().value())));
+ }
+ private static Optional<Email> parse(String email) { try { return Optional.of(Email.of(email)); } catch (Email.InvalidEmailException e) { return Optional.empty(); } }
  @Override @Transactional public void requestRegistrationConfirmation(String recipient,String name,String registrationId,String championshipName) { if (!props.isEnabled()) return; enqueue(EmailType.REGISTRATION_CONFIRMATION,recipient,"REGISTRATION_CONFIRMATION:"+registrationId,payload(Map.of("name",name,"championship",championshipName))); }
  @Override @Transactional public void requestPaymentConfirmation(String recipient,String name,String paymentId,String description,String amount) { if (!props.isEnabled()) return; enqueue(EmailType.PAYMENT_CONFIRMATION,recipient,"PAYMENT_CONFIRMATION:"+paymentId,payload(Map.of("name",name,"description",description,"amount",amount))); }
  private void enqueue(EmailType type,String recipient,String key,String payload) { LocalDateTime now=LocalDateTime.now(); String id=UUID.randomUUID().toString(); int inserted=outbox.insertIgnore(id,type.name(),recipient,crypto.encrypt(payload),now,key); if(inserted>0) log.info("event=EMAIL_QUEUED emailJobId={} type={}",id,type); }

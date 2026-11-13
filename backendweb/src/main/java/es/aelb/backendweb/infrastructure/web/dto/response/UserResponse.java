@@ -19,6 +19,8 @@ public record UserResponse(
         String        role,
         boolean       blocked,
         boolean       emailVerified,
+        String        recoveryEmail,
+        boolean       recoveryEmailVerified,
         String        teamId,
         LocalDateTime createdAt
 ) {
@@ -37,6 +39,8 @@ public record UserResponse(
                 user.getRole().name(),
                 user.isBlocked(),
                 user.isEmailVerified(),
+                user.getRecoveryEmail() == null ? null : user.getRecoveryEmail().value(),
+                user.isRecoveryEmailVerified(),
                 user.getTeamId(),
                 user.getCreatedAt()
         );

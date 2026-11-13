@@ -14,6 +14,9 @@ import {
   type UserProfile, type RegistrationItem, type UserQuota,
 } from '../lib/api'
 import { getSession, clearSession, updateSession } from '../lib/auth'
+import { isPasswordValid } from '../lib/passwordPolicy'
+import PasswordRequirements from '../components/PasswordRequirements'
+import RecoveryEmailCard from '../components/RecoveryEmailCard'
 
 function dateLocale(locale: string) {
   return locale === 'en' ? 'en-US' : 'es-ES'
@@ -167,7 +170,7 @@ export default function PerfilPage() {
       setPwdError(t('errorPasswordsNuevasNoCoinciden'))
       return
     }
-    if (newPwd.length < 8) {
+    if (!isPasswordValid(newPwd)) {
       setPwdError(t('errorPasswordMinimo'))
       return
     }
@@ -576,6 +579,9 @@ export default function PerfilPage() {
               </div>
             </form>
 
+            {/* ── Recovery email card ── */}
+            <RecoveryEmailCard profile={profile} onUpdated={setProfile} />
+
             {/* ── Password change card ── */}
             <form onSubmit={handleChangePassword}
               className="rounded-[0.25rem] border overflow-hidden"
@@ -675,9 +681,7 @@ export default function PerfilPage() {
                       {showNewPwd ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--color-outline)' }}>
-                    {t('minimo8Caracteres')}
-                  </p>
+                  <PasswordRequirements password={newPwd} />
                 </div>
 
                 {/* Confirm new password */}

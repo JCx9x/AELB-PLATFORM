@@ -47,6 +47,9 @@ CREATE TABLE users (
     role          ENUM('USER','GESTOR','ADMIN') NOT NULL DEFAULT 'USER',
     is_blocked    TINYINT(1)   NOT NULL DEFAULT 0,
     email_verified TINYINT(1)  NOT NULL DEFAULT 0,
+    -- Correo secundario para recuperar la contraseña; solo se usa una vez verificado.
+    recovery_email VARCHAR(255),
+    recovery_email_verified TINYINT(1) NOT NULL DEFAULT 0,
     team_id       CHAR(36),
     -- Se incrementa al bloquear/desbloquear, cambiar el rol o la contraseña.
     -- Un access token cuyo claim "ver" no coincida se trata como revocado.
@@ -63,6 +66,7 @@ CREATE TABLE users (
 -- Índices de búsqueda frecuente
 CREATE INDEX idx_users_role      ON users (role);
 CREATE INDEX idx_users_is_blocked ON users (is_blocked);
+CREATE INDEX idx_users_recovery_email ON users (recovery_email);
 
 CREATE TABLE email_outbox (
     id CHAR(36) NOT NULL, type VARCHAR(40) NOT NULL, recipient VARCHAR(255) NOT NULL,
@@ -85,6 +89,13 @@ CREATE TABLE email_verification_tokens (
     used TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id), UNIQUE KEY uq_email_verification_hash (token_hash), KEY idx_email_verification_user_created (user_id, created_at),
     CONSTRAINT fk_email_verification_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE recovery_email_verification_tokens (
+    id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL, recovery_email VARCHAR(255) NOT NULL, token_hash CHAR(64) NOT NULL, expires_at DATETIME NOT NULL,
+    used TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id), UNIQUE KEY uq_recovery_email_verification_hash (token_hash), KEY idx_recovery_email_verification_user_created (user_id, created_at),
+    CONSTRAINT fk_recovery_email_verification_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================

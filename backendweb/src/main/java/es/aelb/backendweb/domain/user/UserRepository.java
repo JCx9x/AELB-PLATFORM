@@ -20,6 +20,8 @@ public interface UserRepository {
     Optional<User> findByEmail(Email email);
     Optional<User> findByDni(Dni dni);
     boolean        existsByEmail(Email email);
+    /** Cuentas que tienen este correo como correo de recuperación ya verificado. */
+    List<User>     findByVerifiedRecoveryEmail(Email recoveryEmail);
     boolean        existsByDni(Dni dni);
     List<User>     findAll();
     PageResult<User> findPage(int page, int size);

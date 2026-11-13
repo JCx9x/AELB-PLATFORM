@@ -78,7 +78,7 @@ function LoginForm() {
         </div>
 
         <div className="relative z-10 px-10 py-6 border-t border-white/10">
-          <p className="text-white/30 text-xs">{t('copyright')}</p>
+          <p className="text-white/30 text-xs">{t('copyright', { year: new Date().getFullYear() })}</p>
         </div>
       </div>
 
@@ -253,7 +253,7 @@ function LoginForm() {
           borderColor: 'var(--color-outline-variant)',
         }}>
           <p className="text-center text-[11px]" style={{ color: 'var(--color-outline)' }}>
-            {t('copyright')}
+            {t('copyright', { year: new Date().getFullYear() })}
             {' · '}<Link href="/privacy" className="hover:underline">{t('privacidad')}</Link>
             {' · '}<Link href="/terms" className="hover:underline">{t('terminos')}</Link>
           </p>

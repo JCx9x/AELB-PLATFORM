@@ -20,6 +20,7 @@ public interface SpringUserJpaRepository extends JpaRepository<UserJpaEntity, St
     @Query("select u from UserJpaEntity u where u.id = :id")
     Optional<UserJpaEntity> findByIdForUpdate(@Param("id") String id);
     boolean                 existsByEmail(String email);
+    java.util.List<UserJpaEntity> findTop5ByRecoveryEmailAndRecoveryEmailVerifiedTrue(String recoveryEmail);
     boolean                 existsByDni(String dni);
     java.util.List<UserJpaEntity> findByTeamId(String teamId);
     Page<UserJpaEntity> findAll(Pageable pageable);

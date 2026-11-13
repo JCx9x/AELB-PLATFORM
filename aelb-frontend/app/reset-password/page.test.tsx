@@ -44,24 +44,27 @@ describe('ResetPasswordPage', () => {
     expect(screen.getByRole('link', { name: /solicitar un enlace nuevo/i })).toHaveAttribute('href', '/forgot-password')
   })
 
-  it('blocks submission when the password is shorter than 8 characters', async () => {
-    const user = userEvent.setup()
-    render(<ResetPasswordPage />)
+  it.each(['short', '12345678', 'password123'])(
+    'blocks submission when the password does not meet the policy (%s)',
+    async (weak) => {
+      const user = userEvent.setup()
+      render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'short')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'short')
-    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
+      await user.type(screen.getByLabelText(/nueva contraseña/i), weak)
+      await user.type(screen.getByLabelText(/confirmar contraseña/i), weak)
+      await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
-    expect(mockResetPassword).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent(/al menos 8 caracteres/i)
-  })
+      expect(mockResetPassword).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert')).toHaveTextContent(/requisitos de seguridad/i)
+    }
+  )
 
   it('blocks submission when passwords do not match', async () => {
     const user = userEvent.setup()
     render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'password123')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'password124')
+    await user.type(screen.getByLabelText(/nueva contraseña/i), 'Password123')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'Password124')
     await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(mockResetPassword).not.toHaveBeenCalled()
@@ -73,12 +76,12 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup()
     render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'newpassword123')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'newpassword123')
+    await user.type(screen.getByLabelText(/nueva contraseña/i), 'Newpassword123')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'Newpassword123')
     await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(await screen.findByText(/contraseña actualizada/i)).toBeInTheDocument()
-    expect(mockResetPassword).toHaveBeenCalledWith('valid-token-123', 'newpassword123')
+    expect(mockResetPassword).toHaveBeenCalledWith('valid-token-123', 'Newpassword123')
     expect(screen.getByRole('link', { name: /iniciar sesión/i })).toHaveAttribute('href', '/login')
   })
 
@@ -89,8 +92,8 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup()
     render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'newpassword123')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'newpassword123')
+    await user.type(screen.getByLabelText(/nueva contraseña/i), 'Newpassword123')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'Newpassword123')
     await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(await screen.findByText(/no es válido o ha expirado/i)).toBeInTheDocument()
@@ -103,8 +106,8 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup()
     render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'newpassword123')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'newpassword123')
+    await user.type(screen.getByLabelText(/nueva contraseña/i), 'Newpassword123')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'Newpassword123')
     await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(screen.getByRole('button', { name: /guardando/i })).toBeDisabled()
@@ -118,8 +121,8 @@ describe('ResetPasswordPage', () => {
     const user = userEvent.setup()
     render(<ResetPasswordPage />)
 
-    await user.type(screen.getByLabelText(/nueva contraseña/i), 'newpassword123')
-    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'newpassword123')
+    await user.type(screen.getByLabelText(/nueva contraseña/i), 'Newpassword123')
+    await user.type(screen.getByLabelText(/confirmar contraseña/i), 'Newpassword123')
     await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(await screen.findByText(/no se ha podido procesar la solicitud/i)).toBeInTheDocument()

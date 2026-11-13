@@ -63,6 +63,12 @@ public class UserJpaEntity {
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified;
 
+    @Column(name = "recovery_email", length = 255)
+    private String recoveryEmail;
+
+    @Column(name = "recovery_email_verified", nullable = false)
+    private boolean recoveryEmailVerified;
+
     @Column(name = "team_id", length = 36)
     private String teamId;
 

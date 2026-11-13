@@ -23,6 +23,8 @@ export default function ForgotPasswordPage() {
   const t = useTranslations('ForgotPassword')
 
   const [email, setEmail] = useState('')
+  // 'recovery': el usuario no recuerda su correo principal y escribe su correo de recuperación.
+  const [mode, setMode] = useState<'primary' | 'recovery'>('primary')
   const [fieldError, setFieldError] = useState<string | null>(null)
 
   const [phase, setPhase] = useState<'form' | 'sent'>('form')
@@ -61,7 +63,7 @@ export default function ForgotPasswordPage() {
     setCorrelationId(null)
 
     try {
-      await forgotPassword(targetEmail)
+      await forgotPassword(targetEmail, mode === 'recovery')
       // Same generic outcome regardless of whether the account exists —
       // the backend already responds identically either way; the UI must
       // never introduce a difference it didn't provide.
@@ -101,6 +103,13 @@ export default function ForgotPasswordPage() {
     void sendResetRequest(trimmed)
   }
 
+  function toggleMode() {
+    setMode(current => current === 'primary' ? 'recovery' : 'primary')
+    setEmail('')
+    setFieldError(null)
+    setErrorMessage(null)
+  }
+
   function handleResend() {
     if (cooldown > 0 || loading || !lastEmail) return
     void sendResetRequest(lastEmail)
@@ -125,7 +134,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="relative z-10 px-10 py-6 border-t border-white/10">
-          <p className="text-white/30 text-xs">{t('copyright')}</p>
+          <p className="text-white/30 text-xs">{t('copyright', { year: new Date().getFullYear() })}</p>
         </div>
       </div>
 
@@ -151,7 +160,7 @@ export default function ForgotPasswordPage() {
                     {t('titulo')}
                   </h2>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {t('instrucciones')}
+                    {mode === 'recovery' ? t('instruccionesRecuperacion') : t('instrucciones')}
                   </p>
                 </div>
 
@@ -178,7 +187,7 @@ export default function ForgotPasswordPage() {
                     <label htmlFor="forgot-email"
                       className="block text-[11px] font-bold uppercase tracking-widest mb-2"
                       style={{ color: 'var(--color-on-surface)' }}>
-                      {t('campoEmail')}
+                      {mode === 'recovery' ? t('campoEmailRecuperacion') : t('campoEmail')}
                     </label>
                     <input
                       id="forgot-email"
@@ -216,6 +225,18 @@ export default function ForgotPasswordPage() {
                   </button>
                 </form>
 
+                <div className="mt-6 rounded-[0.25rem] px-4 py-3 text-sm"
+                  style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-outline-variant)' }}>
+                  <p style={{ color: 'var(--color-on-surface-variant)' }}>
+                    {mode === 'recovery' ? t('recuerdasPrincipal') : t('noRecuerdasPrincipal')}
+                  </p>
+                  <button type="button" onClick={toggleMode}
+                    className="mt-1 font-bold transition-opacity hover:opacity-70"
+                    style={{ color: 'var(--color-primary)' }}>
+                    {mode === 'recovery' ? t('usarCorreoPrincipal') : t('usarCorreoRecuperacion')}
+                  </button>
+                </div>
+
                 <p className="mt-8 text-center text-sm">
                   <Link href="/login" className="font-bold transition-opacity hover:opacity-70"
                     style={{ color: 'var(--color-primary)' }}>
@@ -237,7 +258,9 @@ export default function ForgotPasswordPage() {
                     {t('successTitulo')}
                   </h2>
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--color-on-surface-variant)' }}>
-                    {t('successTexto', { email: maskedEmail })}
+                    {mode === 'recovery'
+                      ? t('successTextoRecuperacion', { email: maskedEmail })
+                      : t('successTexto', { email: maskedEmail })}
                   </p>
                   <p className="text-[11px] mt-3" style={{ color: 'var(--color-outline)' }}>
                     {t('successHint')}
@@ -284,7 +307,7 @@ export default function ForgotPasswordPage() {
           borderColor: 'var(--color-outline-variant)',
         }}>
           <p className="text-center text-[11px]" style={{ color: 'var(--color-outline)' }}>
-            {t('copyright')}
+            {t('copyright', { year: new Date().getFullYear() })}
             {' · '}<Link href="/privacy" className="hover:underline">{t('privacidad')}</Link>
             {' · '}<Link href="/terms" className="hover:underline">{t('terminos')}</Link>
           </p>

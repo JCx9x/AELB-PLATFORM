@@ -50,6 +50,13 @@ public class JpaUserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public List<User> findByVerifiedRecoveryEmail(Email recoveryEmail) {
+        return jpaRepository.findTop5ByRecoveryEmailAndRecoveryEmailVerifiedTrue(recoveryEmail.value()).stream()
+                .map(UserJpaMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public boolean existsByEmail(Email email) {
         return jpaRepository.existsByEmail(email.value());
     }

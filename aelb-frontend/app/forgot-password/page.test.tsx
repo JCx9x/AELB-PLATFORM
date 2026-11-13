@@ -63,7 +63,7 @@ describe('ForgotPasswordPage', () => {
     await user.click(screen.getByRole('button', { name: /enviar enlace/i }))
 
     expect(await screen.findByText(/revisa tu correo/i)).toBeInTheDocument()
-    expect(mockForgotPassword).toHaveBeenCalledWith('existing.user@example.com')
+    expect(mockForgotPassword).toHaveBeenCalledWith('existing.user@example.com', false)
     // Masked, not raw — the local part beyond the first character must not leak.
     expect(screen.getByText(/e\*\*\*@example\.com/)).toBeInTheDocument()
   })
@@ -151,5 +151,29 @@ describe('ForgotPasswordPage', () => {
 
     expect(await screen.findByText(/demasiadas solicitudes/i)).toBeInTheDocument()
     expect(screen.queryByText(/revisa tu correo/i)).not.toBeInTheDocument()
+  })
+
+  // ── Recovery email ─────────────────────────────────────────────────────
+  it('lets a user who forgot the primary email send the link to the recovery email', async () => {
+    mockForgotPassword.mockResolvedValueOnce({ message: 'ok' })
+    const user = userEvent.setup()
+    render(<ForgotPasswordPage />)
+
+    await user.click(screen.getByRole('button', { name: /enviar el enlace a mi correo de recuperación/i }))
+    await user.type(screen.getByLabelText(/correo de recuperación/i), 'backup@example.com')
+    await user.click(screen.getByRole('button', { name: /enviar enlace/i }))
+
+    expect(mockForgotPassword).toHaveBeenCalledWith('backup@example.com', true)
+    expect(await screen.findByText(/correo de recuperación verificado de alguna cuenta/i)).toBeInTheDocument()
+  })
+
+  it('can switch back to the primary email', async () => {
+    const user = userEvent.setup()
+    render(<ForgotPasswordPage />)
+
+    await user.click(screen.getByRole('button', { name: /enviar el enlace a mi correo de recuperación/i }))
+    await user.click(screen.getByRole('button', { name: /usar mi correo principal/i }))
+
+    expect(screen.getByLabelText(/^email$/i)).toBeInTheDocument()
   })
 })

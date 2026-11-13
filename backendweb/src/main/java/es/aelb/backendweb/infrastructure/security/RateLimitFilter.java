@@ -36,6 +36,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new RouteLimit("POST", "/api/auth/password/forgot", 5, Duration.ofMinutes(15)),
             new RouteLimit("POST", "/api/auth/password/reset", 10, Duration.ofMinutes(15)),
             new RouteLimit("POST", "/api/auth/email/resend-verification", 5, Duration.ofMinutes(15)),
+            new RouteLimit("POST", "/api/auth/recovery-email/verify", 10, Duration.ofMinutes(15)),
+            // Cada cambio del correo de recuperación envía un correo de verificación.
+            new RouteLimit("PUT", "/api/users/*/recovery-email", 10, Duration.ofHours(1)),
             // Alta de cuenta: abuso para crear cuentas basura o tantear emails ya registrados.
             new RouteLimit("POST", "/api/users", 8, Duration.ofHours(1)),
             // Creación de checkout de Stripe: evita generar sesiones de pago sin límite.

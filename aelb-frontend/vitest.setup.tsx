@@ -25,10 +25,12 @@ function interpolate(template: string, params?: Record<string, unknown>): string
 vi.mock('next-intl', () => ({
   useTranslations: (namespace: string) => {
     const dict = (es as Messages)[namespace] ?? {}
-    return (key: string, params?: Record<string, unknown>) => {
+    const t = (key: string, params?: Record<string, unknown>) => {
       const value = dict[key]
       return typeof value === 'string' ? interpolate(value, params) : key
     }
+    // t.raw devuelve el valor sin procesar (arrays/objetos), p. ej. listas de pasos o nacionalidades.
+    return Object.assign(t, { raw: (key: string) => dict[key] })
   },
   useLocale: () => 'es',
 }))
